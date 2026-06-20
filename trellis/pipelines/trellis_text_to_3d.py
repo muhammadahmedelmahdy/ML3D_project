@@ -1,11 +1,13 @@
 from typing import *
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from transformers import CLIPTextModel, AutoTokenizer
 import open3d as o3d
 from .base import Pipeline
 from . import samplers
+from .. import models as trellis_models
 from ..modules import sparse as sp
 
 
@@ -275,4 +277,303 @@ class TrellisTextTo3DPipeline(Pipeline):
         ], 1)
         torch.manual_seed(seed)
         slat = self.sample_slat(cond, coords, slat_sampler_params)
+        return self.decode_slat(slat, formats)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # RePaint inpainting helpers
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def _get_repaint_sampler(self, sigma_min: float) -> samplers.FlowEulerRepaintSampler:
+        """Return a cached FlowEulerRepaintSampler for the given sigma_min."""
+        if not hasattr(self, '_repaint_sampler_cache'):
+            self._repaint_sampler_cache: dict = {}
+        if sigma_min not in self._repaint_sampler_cache:
+            self._repaint_sampler_cache[sigma_min] = samplers.FlowEulerRepaintSampler(sigma_min=sigma_min)
+        return self._repaint_sampler_cache[sigma_min]
+
+    def load_sparse_structure_encoder(self, path: str) -> None:
+        """
+        Load the sparse-structure VAE encoder needed for inpainting.
+
+        The encoder is not part of the default generation pipeline, so it must
+        be loaded explicitly before calling run_inpaint().
+
+        Args:
+            path: Local path or HF hub path to the encoder checkpoint
+                  (without .json / .safetensors extension), e.g.
+                  "microsoft/TRELLIS-text-large/ckpts/ss_enc_conv3d_16l8_fp16".
+        """
+        encoder = trellis_models.from_pretrained(path)
+        encoder.eval().to(self.device)
+        self.models['sparse_structure_encoder'] = encoder
+
+    @torch.no_grad()
+    def encode_sparse_structure_latent(self, occupancy_vol: torch.Tensor) -> torch.Tensor:
+        """
+        Encode a binary occupancy volume to the sparse-structure latent space.
+
+        Args:
+            occupancy_vol: Float tensor [N, 1, 64, 64, 64] with values in {0, 1}.
+
+        Returns:
+            Latent tensor [N, C, reso, reso, reso] where C and reso match the
+            flow model's in_channels and resolution (typically 8 and 16).
+        """
+        assert 'sparse_structure_encoder' in self.models, (
+            "Sparse-structure encoder not loaded. "
+            "Call load_sparse_structure_encoder(path) first."
+        )
+        return self.models['sparse_structure_encoder'](
+            occupancy_vol.float().to(self.device), sample_posterior=False
+        )
+
+    def coords_to_occupancy(self, coords: torch.Tensor, reso: int = 64) -> torch.Tensor:
+        """
+        Convert sparse voxel coordinates to a dense binary occupancy volume.
+
+        Args:
+            coords: Int tensor [M, 3] (x, y, z) or [M, 4] (batch, x, y, z).
+            reso: Side length of the output volume.
+
+        Returns:
+            Float tensor [1, 1, reso, reso, reso].
+        """
+        vol = torch.zeros(1, 1, reso, reso, reso, dtype=torch.float32, device=self.device)
+        if coords.shape[1] == 4:
+            vol[0, 0, coords[:, 1], coords[:, 2], coords[:, 3]] = 1.0
+        else:
+            vol[0, 0, coords[:, 0], coords[:, 1], coords[:, 2]] = 1.0
+        return vol
+
+    def downsample_mask(self, mask_3d: torch.Tensor, target_reso: int) -> torch.Tensor:
+        """
+        Downsample a binary 3D mask to the latent resolution using max pooling.
+
+        A latent cell is considered *known* if any of the input voxels it covers
+        is marked as known.
+
+        Args:
+            mask_3d: Float tensor [1, 1, H, W, D] with values in {0, 1}.
+            target_reso: Target resolution (e.g. 16 for the SS latent space).
+
+        Returns:
+            Float tensor [1, 1, target_reso, target_reso, target_reso].
+        """
+        src_reso = mask_3d.shape[2]
+        kernel = src_reso // target_reso
+        if kernel <= 1:
+            return mask_3d.float()
+        return F.max_pool3d(mask_3d.float(), kernel_size=kernel, stride=kernel)
+
+    def coords_to_slat_mask(
+        self,
+        coords: torch.Tensor,
+        known_coords: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Build a per-voxel boolean mask indicating which entries in *coords* are
+        present in *known_coords* (i.e. belong to the known region).
+
+        Args:
+            coords: Int tensor [M, 4] (batch, x, y, z) — full voxel set.
+            known_coords: Int tensor [K, 3] (x, y, z) — known voxels.
+
+        Returns:
+            Bool tensor [M] — True where the voxel is known.
+        """
+        # Convert known_coords to a set of (x,y,z) tuples for O(1) look-up
+        known_set = set(map(tuple, known_coords.cpu().tolist()))
+        mask = torch.tensor(
+            [tuple(c[1:].tolist()) in known_set for c in coords.cpu()],
+            dtype=torch.bool,
+            device=self.device,
+        )
+        return mask
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # RePaint sampling — Stage 1: sparse structure
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def sample_sparse_structure_repaint(
+        self,
+        cond: dict,
+        x0_known: torch.Tensor,
+        structure_mask: torch.Tensor,
+        num_samples: int = 1,
+        sampler_params: dict = {},
+    ) -> torch.Tensor:
+        """
+        Sample sparse structure with RePaint conditioning on known regions.
+
+        Args:
+            cond: Conditioning dict from get_cond().
+            x0_known: Known structure in *latent* space [1, C, reso, reso, reso].
+            structure_mask: Binary mask at latent resolution [1, 1, reso, reso, reso],
+                            1 = keep this cell.
+            num_samples: Number of independent samples.
+            sampler_params: Extra kwargs forwarded to FlowEulerRepaintSampler.sample()
+                            (e.g. num_resample_steps, cfg_strength, …).
+
+        Returns:
+            Sparse coordinates [M, 4] (batch, x, y, z).
+        """
+        flow_model = self.models['sparse_structure_flow_model']
+        reso = flow_model.resolution
+        noise = torch.randn(num_samples, flow_model.in_channels, reso, reso, reso).to(self.device)
+
+        if num_samples > 1:
+            x0_known = x0_known.expand(num_samples, -1, -1, -1, -1)
+            structure_mask = structure_mask.expand(num_samples, -1, -1, -1, -1)
+
+        sampler = self._get_repaint_sampler(self.sparse_structure_sampler.sigma_min)
+        params = {**self.sparse_structure_sampler_params, **sampler_params}
+
+        z_s = sampler.sample(
+            flow_model,
+            noise,
+            x0_known=x0_known,
+            mask=structure_mask,
+            **cond,
+            **params,
+            verbose=True,
+        ).samples
+
+        decoder = self.models['sparse_structure_decoder']
+        coords = torch.argwhere(decoder(z_s) > 0)[:, [0, 2, 3, 4]].int()
+        return coords
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # RePaint sampling — Stage 2: structured latent
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def sample_slat_repaint(
+        self,
+        cond: dict,
+        coords: torch.Tensor,
+        slat0_known: sp.SparseTensor,
+        slat_mask: torch.Tensor,
+        sampler_params: dict = {},
+    ) -> sp.SparseTensor:
+        """
+        Sample SLAT with RePaint conditioning on known voxel features.
+
+        Args:
+            cond: Conditioning dict from get_cond().
+            coords: Voxel coordinates [M, 4] (batch, x, y, z).
+            slat0_known: Known SLAT as a *normalized* SparseTensor (8 channels),
+                         sharing the same coords as *coords*.  Typically obtained
+                         from a prior TRELLIS generation before denormalization.
+            slat_mask: Bool tensor [M] — True for voxels whose features are known.
+            sampler_params: Extra kwargs for FlowEulerRepaintSampler.sample().
+
+        Returns:
+            Decoded (denormalized) SLAT SparseTensor ready for decode_slat().
+        """
+        flow_model = self.models['slat_flow_model']
+        noise = sp.SparseTensor(
+            feats=torch.randn(coords.shape[0], flow_model.in_channels).to(self.device),
+            coords=coords,
+        )
+
+        sampler = self._get_repaint_sampler(self.slat_sampler.sigma_min)
+        params = {**self.slat_sampler_params, **sampler_params}
+
+        slat = sampler.sample(
+            flow_model,
+            noise,
+            x0_known=slat0_known,
+            mask=slat_mask,
+            **cond,
+            **params,
+            verbose=True,
+        ).samples
+
+        std = torch.tensor(self.slat_normalization['std'])[None].to(slat.device)
+        mean = torch.tensor(self.slat_normalization['mean'])[None].to(slat.device)
+        slat = slat * std + mean
+        return slat
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Top-level inpainting entry point
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @torch.no_grad()
+    def run_inpaint(
+        self,
+        prompt: str,
+        mesh: o3d.geometry.TriangleMesh,
+        structure_mask_3d: torch.Tensor,
+        slat_known: Optional[sp.SparseTensor] = None,
+        slat_mask: Optional[torch.Tensor] = None,
+        num_samples: int = 1,
+        seed: int = 42,
+        sparse_structure_sampler_params: dict = {},
+        slat_sampler_params: dict = {},
+        formats: List[str] = ['mesh', 'gaussian', 'radiance_field'],
+    ) -> dict:
+        """
+        Inpaint a 3D asset using RePaint-style conditioning on a known region.
+
+        Stage 1 always runs RePaint on the sparse-structure flow model, preserving
+        the voxel occupancy of the known region while generating new geometry
+        elsewhere.
+
+        Stage 2 optionally runs RePaint on the SLAT flow model when slat_known
+        and slat_mask are provided (e.g. from a previous TRELLIS generation).
+        Otherwise the SLAT is generated from scratch at the new coordinates.
+
+        Args:
+            prompt: Text description of the desired output.
+            mesh: Known partial mesh.  Its voxelized occupancy defines x0_known
+                  for Stage 1.
+            structure_mask_3d: Binary volume [1, 1, 64, 64, 64] in float32,
+                               1 = keep this voxel's latent cell.
+            slat_known: Optional normalized SLAT SparseTensor (8 channels) from a
+                        prior generation.  Required when slat_mask is given.
+            slat_mask: Optional bool tensor [M] marking known voxels in the SLAT.
+                       Required when slat_known is given.
+            num_samples: Number of independent outputs to generate.
+            seed: RNG seed.
+            sparse_structure_sampler_params: Forwarded to sample_sparse_structure_repaint()
+                                             (e.g. num_resample_steps=10, steps=250).
+            slat_sampler_params: Forwarded to sample_slat_repaint() or sample_slat().
+            formats: Output representation formats for decode_slat().
+
+        Returns:
+            dict with keys matching *formats* (e.g. 'mesh', 'gaussian', …).
+        """
+        assert 'sparse_structure_encoder' in self.models, (
+            "Sparse-structure encoder not loaded. "
+            "Call load_sparse_structure_encoder(path) before run_inpaint()."
+        )
+
+        cond = self.get_cond([prompt])
+        torch.manual_seed(seed)
+
+        # ── Stage 1: RePaint on sparse structure ──────────────────────────────
+        known_voxels = self.voxelize(mesh)                         # [K, 3]
+        known_occ = self.coords_to_occupancy(known_voxels)         # [1,1,64,64,64]
+        x0_known_latent = self.encode_sparse_structure_latent(known_occ)
+
+        flow_reso = self.models['sparse_structure_flow_model'].resolution
+        structure_mask_latent = self.downsample_mask(
+            structure_mask_3d.to(self.device), flow_reso
+        )
+
+        coords = self.sample_sparse_structure_repaint(
+            cond,
+            x0_known_latent,
+            structure_mask_latent,
+            num_samples,
+            sparse_structure_sampler_params,
+        )
+
+        # ── Stage 2: SLAT RePaint or unconditional generation ────────────────
+        if slat_known is not None and slat_mask is not None:
+            slat = self.sample_slat_repaint(
+                cond, coords, slat_known, slat_mask, slat_sampler_params
+            )
+        else:
+            slat = self.sample_slat(cond, coords, slat_sampler_params)
+
         return self.decode_slat(slat, formats)
