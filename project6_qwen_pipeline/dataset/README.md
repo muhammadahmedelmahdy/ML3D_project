@@ -1,10 +1,19 @@
-# Dataset directory
+﻿# Dataset Directory
 
-`tutor_raw_like/` is generated from the Exercise 4 subset and contains only
-original part meshes plus sanitized IDs and labels. Provided bounding-box
-meshes must not be placed here.
+This folder holds local dataset artifacts. Generated data is ignored by Git.
 
-`processed/` contains generated JSONL layout records.
+Expected subfolders:
 
-Both generated directories are ignored by Git.
+```text
+public_raw/        small raw PartNet-style samples for local smoke tests
+tutor_raw_like/    temporary raw-like data derived from the Exercise 4 subset
+processed/         compact layout JSON records used as Qwen examples
+```
 
+`processed/` is the important folder for the online pipeline. After the full
+PartNet-Mobility dataset is available, preprocessing should fill it with many
+layout examples across the available categories.
+
+The temporary `tutor_raw_like/` path must contain only original part geometry
+and sanitized labels/IDs. Provided Exercise 4 bbox meshes should not be placed
+there, because the project pipeline should compute boxes itself.

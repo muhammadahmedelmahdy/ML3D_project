@@ -1,44 +1,56 @@
-# Data Flow
+﻿# Data Flow
 
-There are two separate flows:
+This file explains what happens to the data before and during generation.
 
-1. **Offline preparation:** process PartNet-Mobility once and create compact
-   layout examples.
-2. **Online generation:** receive a user request, select relevant prepared
-   examples, and ask Qwen for a new layout.
+The pipeline has two parts:
 
-The user request does **not** load raw 3D assets directly.
+1. **Offline preparation:** run once on the PartNet-Mobility dataset and create
+   small example files.
+2. **Online generation:** run whenever a user asks for a new object.
+
+The important idea is:
+
+```text
+raw 3D dataset objects
+-> simple part boxes
+-> Qwen uses those boxes as examples
+-> Qwen proposes new boxes for a new object
+```
+
+The user request does **not** directly load raw 3D meshes. The raw meshes are
+processed beforehand into compact JSON files.
 
 ## Offline Preparation
 
 ### 1. Download PartNet-Mobility
 
-The full PartNet-Mobility dataset is downloaded before the pipeline runs. It
-contains one directory per object. For example, one directory may represent a
-chair and another may represent an oven.
+PartNet-Mobility contains many 3D objects. Each object has its own folder. For
+example, one folder may be one chair and another folder may be one oven.
 
-Each raw object directory provides files such as:
+Each object folder contains files such as:
 
-- `meta.json`: says whether the object is a chair, oven, etc.
-- `semantics.txt`: gives names such as `leg`, `seat`, or `door`.
-- `mobility.urdf`: connects parts, transforms, and OBJ paths.
-- `textured_objs/*.obj`: contains the actual 3D geometry.
+- `meta.json`: says the object category, for example `Chair` or `Oven`.
+- `semantics.txt`: gives readable part names, for example `leg`, `seat`, or
+  `door`.
+- `mobility.urdf`: describes how the parts belong together and where their mesh
+  files are.
+- `textured_objs/*.obj`: contains the actual 3D surface geometry.
 
-These files come from the downloaded dataset. We do not create them.
+These files come from the downloaded dataset. We do not create them ourselves.
 
-### 2. Read one raw PartNet object
+### 2. Read one raw object
 
-One PartNet object is one complete object, such as one specific oven. That oven
-contains several **part instances**, for example:
+One raw object is one complete object, such as one specific oven. That oven may
+contain several part instances:
 
 - three trays
 - two doors
 - one oven body
 
-The dataset does not initially call them `door_1` or `tray_2`. Instead, the
-URDF gives every part instance a technical link name such as `link_0`.
+The dataset usually gives these parts technical names such as `link_0`,
+`link_1`, and `link_2`.
 
-`semantics.txt` connects the technical name to a human-readable label:
+`semantics.txt` connects those technical names to readable labels:
 
 ```text
 link_0 slider translation_tray
@@ -46,8 +58,8 @@ link_3 hinge door
 link_5 static oven_body
 ```
 
-`mobility.urdf` contains the same technical link names. Inside each link, it
-lists the OBJ geometry files used to draw that part:
+`mobility.urdf` uses the same technical names and tells us which OBJ mesh files
+belong to each part:
 
 ```text
 link_3
@@ -56,11 +68,11 @@ link_3
 -> textured_objs/original-29.obj
 ```
 
-An OBJ file stores a piece of a 3D surface as points and triangles. One logical
-part can use several OBJ files because its surface may have been saved as
-separate pieces. These pieces still belong to the same part instance.
+An OBJ file stores part of a 3D surface as points and triangles. One logical
+part can use several OBJ files, so we first need to know which pieces belong
+together.
 
-`load_raw_partnet_object()` matches the repeated link name across the files:
+`load_raw_partnet_object()` connects the files:
 
 ```text
 semantics.txt says: link_3 is a door
@@ -72,23 +84,22 @@ label = door
 geometry files = original-1.obj, original-11.obj, original-29.obj, ...
 ```
 
-This function only creates the mapping. It does not load the 3D points yet.
+At this stage we only know the mapping. We have not loaded the 3D points yet.
 
 ```text
 raw PartNet files
--> part instances with names and lists of geometry files
+-> part names and lists of mesh files
 ```
 
 ### 3. Build each part's geometry
 
-Each OBJ file contains many XYZ points and triangles. To calculate one box for
-a complete door, we first need all surface pieces of that door together.
+To calculate a box for one part, we need all 3D points of that part together.
 
-`load_part_link_vertices()` does this for one part instance:
+`load_part_link_vertices()` does this for one part:
 
-1. Load the XYZ points from every OBJ file assigned to the part.
-2. Apply the position, rotation, and size stored for each piece in the URDF.
-3. Combine all transformed points into one collection for that part.
+1. Load the XYZ points from every OBJ file assigned to that part.
+2. Apply the position, rotation, and scale written in the URDF.
+3. Combine all transformed points into one point cloud for that part.
 
 Example:
 
@@ -97,25 +108,24 @@ door OBJ piece 1: 800 points
 door OBJ piece 2: 500 points
 door OBJ piece 3: 300 points
 
--> one door containing 1,600 points
+-> one door with 1,600 points
 ```
 
-The function does not invent or generate new geometry. It only combines the
-pieces that the dataset says belong together.
+The function does not generate new geometry. It only combines the geometry that
+already exists in the dataset.
 
 ```text
-several OBJ surface pieces for link_3
+several OBJ pieces for link_3
 -> one combined door part
 ```
 
-### 4. Place all parts in the object
+### 4. Put all parts into one object space
 
-After step 3, we know the shape of each part, but its points can still be in the
-part's own **local coordinate system**.
+After step 3, each part has its own points. But those points may still be in the
+part's local coordinate system.
 
-For example, a door may initially think that its own hinge is at position
-`[0, 0, 0]`. That does not mean the hinge belongs at the center of the complete
-oven. We must still place the door relative to the oven body.
+Simple intuition: a door can describe itself relative to its own hinge. But for
+the complete oven, we need to know where that door is relative to the oven body.
 
 The URDF stores parent-child relationships such as:
 
@@ -126,7 +136,7 @@ base
    -> tray
 ```
 
-It also stores the position and rotation between each parent and child.
+It also stores the position and rotation between parent and child parts.
 
 `link_transforms_to_root()` follows this chain. For a door, it combines:
 
@@ -138,29 +148,30 @@ where the oven body is relative to the base
 
 `load_object_part_vertices()` applies these transforms to every part.
 
-Afterward, all parts use the same coordinate system. We can now correctly say
-that one tray is above another tray or that a door is in front of the body.
+After this step, all parts use the same coordinate system. Now we can correctly
+compare their positions, for example whether one tray is above another tray.
 
 ```text
-separate parts in local coordinates
--> all parts in one object coordinate system
+parts in separate local coordinates
+-> all parts in one shared object coordinate system
 ```
 
 The current implementation uses the URDF **zero pose**. This means movable
-parts such as doors and drawers stay in the default position recorded by the
-dataset. We are not opening or moving them ourselves.
+parts such as doors and drawers stay in the default dataset position. We do not
+open or move them ourselves.
 
 ### 5. Calculate normalized bounding boxes
 
-Now every part is represented by many XYZ surface points. Qwen does not need
-all these points. It only needs a simple box describing where the part is.
+Qwen does not need thousands of 3D points. It only needs a simple box for each
+part.
 
-For one part, `build_layout_record()` looks through all its points and finds:
+For one part, `build_layout_record()` looks at all its points and finds:
 
 - smallest X, Y, and Z values: `min`
 - largest X, Y, and Z values: `max`
 
-These two corners define the smallest axis-aligned box containing the part.
+Those two corners define an axis-aligned bounding box. Axis-aligned means the
+box is not rotated; it follows the X, Y, and Z axes.
 
 Example:
 
@@ -175,121 +186,121 @@ min = [-0.8, -0.5, -0.7]
 max = [-0.6,  0.5,  0.4]
 ```
 
-Different dataset objects can have very different real sizes and coordinate
-values. Therefore, `build_layout_record()` centers and uniformly scales the
-**complete object** so that it fits inside `[-0.5, 0.5]^3`.
+Dataset objects can have very different sizes. Therefore, `build_layout_record()`
+centers and uniformly scales the **complete object** so that it fits inside
+`[-0.5, 0.5]^3`.
 
-We normalize the complete object once, not every part separately. This keeps
-the relative layout intact. A door that was beside the body remains beside the
-body after normalization.
+We scale the complete object once, not every part separately. This keeps the
+relative layout intact. A door that was beside the body stays beside the body.
 
-The output is Z-up, meaning the Z direction represents height.
+The output is Z-up, meaning Z is the height direction.
 
-`extract_raw_partnet_object()` runs the reading, placement, and box-calculation
-steps for one raw object.
+`extract_raw_partnet_object()` runs all raw-object steps for one object:
 
 ```text
-positioned part geometry
--> labeled numerical bounding boxes
--> canonical layout JSON
+raw object folder
+-> positioned part geometry
+-> labeled bounding boxes
+-> compact layout JSON
 ```
 
-Example output:
-
-```json
-{
-  "category": "Oven",
-  "parts": [
-    {
-      "id": "link_3",
-      "label": "door",
-      "bbox": {
-        "min": [-0.30, -0.35, -0.48],
-        "max": [-0.24, 0.35, 0.05]
-      }
-    }
-  ]
-}
-```
-
-The offline preparation repeats these steps for many dataset objects. The
-result is a collection of compact layout JSON records. Qwen does not need the
-raw OBJ or URDF files after this preparation.
+Offline preparation repeats this for many dataset objects. The result is a
+collection of compact JSON records in `dataset/processed/`. After that, Qwen no
+longer needs the raw OBJ or URDF files for prompting.
 
 ## Online Generation
 
-### 6. Receive a user request
+The normal online entry point is:
 
-Example:
+```bash
+python run_interactive.py
+```
+
+The script asks for one text request in the terminal.
+
+### 6. Choose the target category
+
+Example request:
 
 ```text
 Create a chair with three legs.
 ```
 
-`build_category_prompt()` combines the request with the 46 valid dataset
-category names. No geometry or bounding boxes are included in this first Qwen
-prompt.
+`build_category_prompt()` gives Qwen the request and the valid dataset category
+names. It does not include geometry or bounding boxes yet.
 
-Qwen returns a small response such as:
+Qwen returns a small JSON answer such as:
 
 ```json
 {"category": "Chair"}
 ```
 
-`parse_category_response()` checks that this is valid JSON and that `Chair` is
-one of the allowed dataset categories. A retrieval step will then select a few
-prepared chair layout records from the collection.
+`parse_category_response()` checks that the answer is valid JSON and that
+`Chair` is one of the allowed categories.
 
 ```text
-user request + list of allowed categories
--> first Qwen prompt
--> validated target category
--> relevant prepared layout examples
+user request + allowed categories
+-> Qwen category prompt
+-> Qwen category answer
+-> validated category
 ```
 
-The retrieval function is not implemented yet. For now, examples are supplied
-manually.
+### 7. Load matching examples
 
-### 7. Build the Qwen prompt
+After the category is known, `load_layout_examples()` searches
+`dataset/processed/` for objects with the same category.
 
-`build_layout_prompt()` receives one or more already-selected layout records.
-It converts up to five examples into compact JSON and adds the user's request.
+For example, if Qwen selected `Chair`, it loads a few processed chair examples.
+These examples contain only part labels and boxes, not raw meshes.
 
 ```text
-example layouts + user request
--> Qwen prompt
+validated category
+-> matching processed examples
 ```
 
-Currently, the prompt uses the one public oven example. Dataset retrieval is
-not implemented yet.
+Current smoke-test status: we currently have one processed oven example. After
+the full dataset is processed, this same step should load examples across many
+categories.
 
 ### 8. Generate and validate a new layout
 
-Qwen receives the prompt and returns a new description with labeled bounding
-boxes. The actual Qwen model call is not implemented in this project yet.
+`build_layout_prompt()` gives Qwen:
 
-`parse_layout_response()` validates the returned JSON, part IDs, labels, box
-corners, category, and coordinate range.
+- the original user request
+- the validated category
+- up to five matching example layouts
+
+Qwen then proposes a new JSON layout with labeled part boxes.
+
+`parse_layout_response()` checks that the answer has valid JSON, part IDs,
+labels, box corners, category, and coordinate ranges.
 
 ```text
-Qwen prompt
--> Qwen response text
+user request + category + examples
+-> Qwen layout prompt
+-> Qwen layout answer
 -> validated new layout JSON
 ```
+
+The validated layout is the output of the current Qwen-side pipeline. Later
+TRELLIS/RePaint code can use these boxes as the rough structure that should be
+kept or filled in during 3D generation.
 
 ## Complete Flow
 
 ```text
 OFFLINE, ONCE:
 downloaded PartNet objects
--> named and positioned parts
--> normalized bounding boxes
--> collection of prepared layout examples
+-> read part names and mesh files
+-> place all parts in one object space
+-> calculate normalized part boxes
+-> save compact examples
 
 ONLINE, FOR EACH USER REQUEST:
 user text request
--> select relevant prepared examples
--> Qwen prompt
--> proposed bounding boxes
--> validated layout JSON
+-> Qwen selects category
+-> load matching examples
+-> Qwen proposes new part boxes
+-> validate layout JSON
+-> pass boxes to later TRELLIS/RePaint stage
 ```

@@ -1,144 +1,193 @@
-﻿# Project 6 Qwen Pipeline
+# Project 6 Qwen Pipeline
 
-This prototype extracts normalized, labeled part bounding boxes without using
-the bounding boxes supplied in Exercise 4.
+This package turns PartNet-Mobility objects into compact part-layout examples
+and uses Qwen to propose a new object layout from a natural-language request.
 
-The temporary input format contains only information also expected from the
-full PartNet-Mobility dataset:
+The intended user flow is simple:
 
-- object ID and category
-- part IDs and labels
-- original part geometry
-
-## Setup
-
-```powershell
-python -m pip install -e .
+```text
+user request
+-> Qwen chooses the closest PartNet-Mobility category
+-> matching processed examples are loaded
+-> Qwen proposes labeled part bounding boxes
+-> the JSON output is validated
 ```
 
-For the Qwen step on the VM, the environment also needs `torch`, `transformers`,
-and `accelerate`. The default model path is:
+The Qwen output is a coarse structural layout. Later pipeline stages can turn
+those boxes into a TRELLIS/RePaint structural condition.
+
+## VM Setup For Teammates
+
+Each teammate logs into the cluster with their own account and requests a GPU:
+
+```bash
+ssh <username>@ml3d.vc.in.tum.de
+salloc --gpus=1
+```
+
+The shared project files are under:
+
+```text
+/cluster/52/jonasclotten/shared/project6
+```
+
+The shared Qwen weights are already downloaded here:
 
 ```text
 /cluster/52/jonasclotten/shared/project6/models/Qwen3-8B
 ```
 
-## Folder convention
-
-Keep prompt files and model answers separate:
+The repo has already been cloned here:
 
 ```text
-prompts/   text prompts that we send to Qwen
-outputs/   raw answers that Qwen writes back
+/cluster/52/jonasclotten/shared/project6/repo
 ```
 
-The output files are later checked by the validators.
-
-## Prepare the tutor subset
-
-Download or copy the Exercise 4 `partnet_primitives` directory somewhere
-outside this project. Then strip it into the raw-like format:
-
-```powershell
-project6-layouts prepare `
-  --source C:\path\to\partnet_primitives `
-  --output dataset\tutor_raw_like
-```
-
-Only `parts_orig` meshes and sanitized metadata are copied. The command never
-copies `parts_bbox`.
-
-## Extract layouts
-
-```powershell
-project6-layouts extract `
-  --input dataset\tutor_raw_like `
-  --output dataset\processed\layouts.jsonl
-```
-
-Each output line contains one object with normalized Z-up part boxes in the
-TRELLIS coordinate cube `[-0.5, 0.5]^3`.
-
-## Raw PartNet adapter status
-
-The first raw-data adapter stage parses `meta.json`, `semantics.txt`, and
-`mobility.urdf`. It maps semantic URDF links to their visual OBJ paths and
-records parent-link relationships. Visual meshes can now be loaded, scaled,
-offset, and combined in each link's local frame. Joint transforms are
-accumulated through the URDF hierarchy to place every part in one common
-zero-pose object frame. The `extract-raw` command then calculates one box per
-semantic part and normalizes the complete object into `[-0.5, 0.5]^3`:
-
-```powershell
-project6-layouts extract-raw `
-  --input dataset\public_raw\7179 `
-  --output dataset\processed\7179.json
-```
-
-## Build and run the category prompt
-
-First, build a prompt from only the user's request:
-
-```powershell
-project6-layouts build-category-prompt `
-  --request "Create a chair with three legs" `
-  --output prompts\category_chair_three_legs.txt
-```
-
-Run that prompt through Qwen on the VM:
+To get the latest code after someone pushed changes, run:
 
 ```bash
+cd /cluster/52/jonasclotten/shared/project6/repo
+git pull
+```
+
+Each teammate still needs their own Python/Conda environment. The shared folder
+contains model weights and project files, not a shared Conda environment.
+
+## Setup
+
+From this folder, install the package into the active environment:
+
+```bash
+python -m pip install -e .
+```
+
+For the Qwen step on the VM, the environment also needs `torch`, `transformers`,
+and `accelerate`. The code uses this default shared model path:
+
+```text
+/cluster/52/jonasclotten/shared/project6/models/Qwen3-8B
+```
+
+## Normal VM Usage
+
+The normal entry point is:
+
+```bash
+python run_interactive.py
+```
+
+It asks for one user request in the terminal, for example:
+
+```text
+Create a compact oven with two front doors.
+```
+
+Then it automatically:
+
+1. writes the category prompt to `prompts/`,
+2. runs Qwen and writes the category answer to `outputs/`,
+3. validates the category,
+4. loads matching processed layout examples from `dataset/processed/`,
+5. writes the layout prompt to `prompts/`,
+6. runs Qwen again and writes the layout answer to `outputs/`,
+7. validates the final layout JSON.
+
+The user should not normally call the lower-level prompt commands by hand.
+
+Current smoke-test status: we currently have one processed oven example for
+end-to-end testing. After the full PartNet-Mobility dataset is available,
+`dataset/processed/` should contain many examples across the available
+categories, and the same interactive script should continue to be the main
+entry point.
+
+## Folder Convention
+
+```text
+dataset/processed/   compact layout examples extracted from PartNet-Mobility
+prompts/             prompt text files sent to Qwen
+outputs/             raw Qwen response files
+```
+
+The generated data, prompts, and outputs are local artifacts and are ignored by
+Git except for their README files.
+
+## Dataset Preparation
+
+The full PartNet-Mobility dataset is expected to provide raw object folders
+containing files such as:
+
+```text
+meta.json
+semantics.txt
+mobility.urdf
+textured_objs/*.obj
+```
+
+The raw extractor reads those files, calculates one normalized bounding box per
+semantic part, and writes compact layout JSON records.
+
+For one raw object:
+
+```bash
+project6-layouts extract-raw \
+  --input dataset/public_raw/7179 \
+  --output dataset/processed/7179.json
+```
+
+For the temporary Exercise 4 tutor subset, this package also has a compatibility
+path that strips away the provided bbox meshes and keeps only original part
+geometry:
+
+```bash
+project6-layouts prepare \
+  --source /path/to/partnet_primitives \
+  --output dataset/tutor_raw_like
+
+project6-layouts extract \
+  --input dataset/tutor_raw_like \
+  --output dataset/processed/layouts.jsonl
+```
+
+The tutor-subset path is only a development fallback. The real project should
+use the raw PartNet-Mobility data once it is available.
+
+## Debug Commands
+
+The lower-level commands are useful when debugging a single step:
+
+```bash
+project6-layouts build-category-prompt \
+  --request "Create a chair with three legs" \
+  --output prompts/category_chair_three_legs.txt
+
 project6-layouts run-qwen \
   --prompt prompts/category_chair_three_legs.txt \
   --output outputs/category_chair_three_legs.json
+
+project6-layouts validate-category-response \
+  --input outputs/category_chair_three_legs.json
 ```
 
-Qwen must return a category such as `{"category":"Chair"}`. Validate it:
-
-```powershell
-project6-layouts validate-category-response `
-  --input outputs\category_chair_three_legs.json
-```
-
-The returned category is then used to select layout examples for the second
-prompt.
-
-## Build and run the layout prompt
-
-The prompt formatter accepts one to five already-selected layout records. It
-does not search the dataset yet.
-
-```powershell
-project6-layouts build-prompt `
-  --request "A compact oven with two front doors" `
-  --category Oven `
-  --examples dataset\processed\7179.json `
-  --output prompts\layout_compact_oven.txt
-```
-
-Run Qwen on the VM:
+For layout generation:
 
 ```bash
+project6-layouts build-prompt \
+  --request "A compact oven with two front doors" \
+  --category Oven \
+  --examples dataset/processed/7179.json \
+  --output prompts/layout_compact_oven.txt
+
 project6-layouts run-qwen \
   --prompt prompts/layout_compact_oven.txt \
-  --output outputs/layout_compact_oven.json \
-  --max-new-tokens 2048
-```
+  --output outputs/layout_compact_oven.json
 
-## Validate Qwen layout output
-
-The response validator accepts only the requested JSON structure. It rejects
-Markdown, missing or extra fields, duplicate IDs, invalid boxes, and
-coordinates outside the normalized cube.
-
-```powershell
-project6-layouts validate-response `
-  --input outputs\layout_compact_oven.json `
+project6-layouts validate-response \
+  --input outputs/layout_compact_oven.json \
   --category Oven
 ```
 
 ## Tests
 
-```powershell
+```bash
 python -m unittest discover -s tests -v
 ```
