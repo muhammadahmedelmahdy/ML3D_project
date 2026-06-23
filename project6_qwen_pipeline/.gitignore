@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+dataset/tutor_raw_like/
+dataset/public_raw/
+dataset/processed/
