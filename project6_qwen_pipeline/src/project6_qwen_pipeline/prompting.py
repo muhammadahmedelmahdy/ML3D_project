@@ -6,7 +6,7 @@ from typing import Any, Sequence
 from .extractor import validate_layout
 
 
-MAX_CONTEXT_EXAMPLES = 5
+MAX_CONTEXT_EXAMPLES = 50
 
 
 def _compact_example(record: dict[str, Any]) -> dict[str, Any]:

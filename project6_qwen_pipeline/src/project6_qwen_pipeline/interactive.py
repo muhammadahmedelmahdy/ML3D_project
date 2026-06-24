@@ -14,7 +14,7 @@ from .response import parse_layout_response
 
 DEFAULT_PROMPT_DIR = Path("prompts")
 DEFAULT_OUTPUT_DIR = Path("outputs")
-DEFAULT_PROCESSED_DIR = Path("dataset") / "processed"
+DEFAULT_PROCESSED_DIR = Path("/cluster/52/jonasclotten/shared/project6/data/processed")
 
 
 def main() -> None:
@@ -60,7 +60,7 @@ def run_interactive_pipeline(
 
     category_prompt = build_category_prompt(clean_request)
     category_prompt_path.write_text(category_prompt + "\n", encoding="utf-8")
-    run_qwen_file(category_prompt_path, category_output_path, model_path=model_path)
+    run_qwen_file(category_prompt_path, category_output_path, model_path=model_path, thinking=False)
     category = parse_category_response(category_output_path.read_text(encoding="utf-8"))
 
     result: dict[str, Any] = {
@@ -72,7 +72,7 @@ def run_interactive_pipeline(
         "layout_part_count": None,
     }
 
-    examples = load_layout_examples(processed_dir, category, limit=5)
+    examples = load_layout_examples(processed_dir, category, limit=20)
     if not examples:
         return result
 
@@ -80,7 +80,7 @@ def run_interactive_pipeline(
     layout_output_path = output_dir / f"layout_{slug}.json"
     layout_prompt = build_layout_prompt(clean_request, category, examples)
     layout_prompt_path.write_text(layout_prompt + "\n", encoding="utf-8")
-    run_qwen_file(layout_prompt_path, layout_output_path, model_path=model_path)
+    run_qwen_file(layout_prompt_path, layout_output_path, model_path=model_path, thinking=False)
 
     layout = parse_layout_response(
         layout_output_path.read_text(encoding="utf-8"),
@@ -96,7 +96,7 @@ def load_layout_examples(
     processed_dir: Path,
     category: str,
     *,
-    limit: int = 5,
+    limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Load up to `limit` prepared layout records for one category."""
     processed_dir = Path(processed_dir)
