@@ -1,0 +1,76 @@
+{
+  "obj_id": "100248",
+  "model_cat": "Suitcase",
+  "parts": [
+    {
+      "id": 1,
+      "name": "handle",
+      "slug": "1_handle",
+      "objs": [
+        "original-2",
+        "original-7",
+        "original-26"
+      ],
+      "aabb_min": [
+        -0.170314,
+        0.573972,
+        -0.1409
+      ],
+      "aabb_max": [
+        0.196806,
+        1.000391,
+        -0.108158
+      ],
+      "n_vertices_orig": 564,
+      "n_faces_orig": 352
+    },
+    {
+      "id": 2,
+      "name": "base_body",
+      "slug": "2_base_body",
+      "objs": [
+        "original-29",
+        "original-21",
+        "original-30",
+        "original-28",
+        "original-4",
+        "original-3",
+        "original-33",
+        "original-16",
+        "original-8",
+        "original-13",
+        "original-9",
+        "original-35",
+        "original-5",
+        "original-27",
+        "original-6",
+        "original-31",
+        "original-15",
+        "original-23",
+        "original-11",
+        "original-34",
+        "original-18",
+        "original-25",
+        "original-17",
+        "original-12",
+        "original-24",
+        "original-20",
+        "original-32",
+        "original-10",
+        "original-19"
+      ],
+      "aabb_min": [
+        -0.409969,
+        -0.700659,
+        -0.202881
+      ],
+      "aabb_max": [
+        0.492832,
+        0.660116,
+        0.218337
+      ],
+      "n_vertices_orig": 21010,
+      "n_faces_orig": 12036
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "obj_id": "100282",
+  "model_cat": "WashingMachine",
+  "parts": [
+    {
+      "id": 1,
+      "name": "door",
+      "slug": "1_door",
+      "objs": [
+        "original-14",
+        "original-9",
+        "original-12",
+        "original-10",
+        "original-11",
+        "original-13"
+      ],
+      "aabb_min": [
+        -0.383246,
+        -0.224599,
+        0.309867
+      ],
+      "aabb_max": [
+        0.379609,
+        0.545408,
+        0.517744
+      ],
+      "n_vertices_orig": 768,
+      "n_faces_orig": 728
+    },
+    {
+      "id": 3,
+      "name": "button",
+      "slug": "3_button",
+      "objs": [
+        "original-25"
+      ],
+      "aabb_min": [
+        0.320322,
+        0.56732,
+        0.471022
+      ],
+      "aabb_max": [
+        0.347812,
+        0.595271,
+        0.479899
+      ],
+      "n_vertices_orig": 240,
+      "n_faces_orig": 232
+    },
+    {
+      "id": 4,
+      "name": "button",
+      "slug": "4_button",
+      "objs": [
+        "original-26"
+      ],
+      "aabb_min": [
+        0.277369,
+        0.561534,
+        0.471913
+      ],
+      "aabb_max": [
+        0.304859,
+        0.589484,
+        0.48079
+      ],
+      "n_vertices_orig": 240,
+      "n_faces_orig": 232
+    },
+    {
+      "id": 5,
+      "name": "button",
+      "slug": "5_button",
+      "objs": [
+        "original-27"
+      ],
+      "aabb_min": [
+        0.234415,
+        0.555747,
+        0.472804
+      ],
+      "aabb_max": [
+        0.261905,
+        0.583698,
+        0.481681
+      ],
+      "n_vertices_orig": 240,
+      "n_faces_orig": 232
+    },
+    {
+      "id": 6,
+      "name": "button",
+      "slug": "6_button",
+      "objs": [
+        "original-28"
+      ],
+      "aabb_min": [
+        0.191462,
+        0.549961,
+        0.473695
+      ],
+      "aabb_max": [
+        0.218952,
+        0.577911,
+        0.482572
+      ],
+      "n_vertices_orig": 240,
+      "n_faces_orig": 232
+    },
+    {
+      "id": 7,
+      "name": "button",
+      "slug": "7_button",
+      "objs": [
+        "original-30"
+      ],
+      "aabb_min": [
+        0.181205,
+        0.651255,
+        0.44985
+      ],
+      "aabb_max": [
+        0.208764,
+        0.678517,
+        0.462955
+      ],
+      "n_vertices_orig": 240,
+      "n_faces_orig": 232
+    },
+    {
+      "id": 8,
+      "name": "button",
+      "slug": "8_button",
+      "objs": [
+        "original-3",
+        "original-4",
+        "original-6"
+      ],
+      "aabb_min": [
+        -0.040828,
+        0.606556,
+        0.445821
+      ],
+      "aabb_max": [
+        0.037191,
+        0.686124,
+        0.492576
+      ],
+      "n_vertices_orig": 428,
+      "n_faces_orig": 388
+    },
+    {
+      "id": 9,
+      "name": "button",
+      "slug": "9_button",
+      "objs": [
+        "original-29"
+      ],
+      "aabb_min": [
+        0.371908,
+        0.651381,
+        0.45018
+      ],
+      "aabb_max": [
+        0.399466,
+        0.678643,
+        0.463285
+      ],
+      "n_vertices_orig": 240,
+      "n_faces_orig": 232
+    },
+    {
+      "id": 10,
+      "name": "button",
+      "slug": "10_button",
+      "objs": [
+        "original-24"
+      ],
+      "aabb_min": [
+        0.363275,
+        0.573107,
+        0.470131
+      ],
+      "aabb_max": [
+        0.390765,
+        0.601057,
+        0.479008
+      ],
+      "n_vertices_orig": 240,
+      "n_faces_orig": 232
+    },
+    {
+      "id": 11,
+      "name": "base_body",
+      "slug": "11_base_body",
+      "objs": [
+        "original-21",
+        "original-36",
+        "original-41",
+        "original-22",
+        "original-33",
+        "original-16",
+        "original-8",
+        "original-35",
+        "original-39",
+        "original-5",
+        "original-37",
+        "original-38",
+        "original-18",
+        "original-17",
+        "original-42",
+        "original-20",
+        "original-32",
+        "original-19",
+        "original-40"
+      ],
+      "aabb_min": [
+        -0.517612,
+        -0.758353,
+        -0.513844
+      ],
+      "aabb_max": [
+        0.513975,
+        0.711659,
+        0.517744
+      ],
+      "n_vertices_orig": 8364,
+      "n_faces_orig": 10618
+    }
+  ]
+}

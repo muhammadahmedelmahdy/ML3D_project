@@ -1,0 +1,66 @@
+{
+  "obj_id": "100015",
+  "model_cat": "KitchenPot",
+  "parts": [
+    {
+      "id": 1,
+      "name": "lid",
+      "slug": "1_lid",
+      "objs": [
+        "original-17",
+        "original-10",
+        "original-11",
+        "original-8",
+        "original-1",
+        "original-13",
+        "original-15",
+        "original-14",
+        "original-16"
+      ],
+      "aabb_min": [
+        -0.589275,
+        0.2581,
+        -0.559779
+      ],
+      "aabb_max": [
+        0.58228,
+        0.507634,
+        0.611776
+      ],
+      "n_vertices_orig": 7319,
+      "n_faces_orig": 4762
+    },
+    {
+      "id": 2,
+      "name": "base_body",
+      "slug": "2_base_body",
+      "objs": [
+        "original-29",
+        "original-21",
+        "original-30",
+        "original-22",
+        "original-26",
+        "original-5",
+        "original-27",
+        "original-6",
+        "original-31",
+        "original-23",
+        "original-25",
+        "original-7",
+        "original-19"
+      ],
+      "aabb_min": [
+        -0.908077,
+        -0.32619,
+        -0.582304
+      ],
+      "aabb_max": [
+        0.901081,
+        0.342256,
+        0.634301
+      ],
+      "n_vertices_orig": 16552,
+      "n_faces_orig": 9056
+    }
+  ]
+}

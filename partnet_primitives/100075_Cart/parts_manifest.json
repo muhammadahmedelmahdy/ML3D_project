@@ -1,0 +1,130 @@
+{
+  "obj_id": "100075",
+  "model_cat": "Cart",
+  "parts": [
+    {
+      "id": 1,
+      "name": "wheel",
+      "slug": "1_wheel",
+      "objs": [
+        "original-18",
+        "original-15",
+        "original-13",
+        "original-12",
+        "original-10",
+        "original-19",
+        "original-20",
+        "original-17",
+        "original-16",
+        "original-14"
+      ],
+      "aabb_min": [
+        -0.32464,
+        -0.28464,
+        0.025993
+      ],
+      "aabb_max": [
+        -0.255826,
+        0.066771,
+        0.343474
+      ],
+      "n_vertices_orig": 13197,
+      "n_faces_orig": 9832
+    },
+    {
+      "id": 2,
+      "name": "wheel",
+      "slug": "2_wheel",
+      "objs": [
+        "original-36",
+        "original-38",
+        "original-30",
+        "original-35",
+        "original-39",
+        "original-40",
+        "original-34",
+        "original-37",
+        "original-33",
+        "original-32"
+      ],
+      "aabb_min": [
+        0.262358,
+        -0.28464,
+        0.026154
+      ],
+      "aabb_max": [
+        0.35178,
+        0.066771,
+        0.341571
+      ],
+      "n_vertices_orig": 13197,
+      "n_faces_orig": 9832
+    },
+    {
+      "id": 3,
+      "name": "handle",
+      "slug": "3_handle",
+      "objs": [
+        "original-48",
+        "original-4",
+        "original-5"
+      ],
+      "aabb_min": [
+        -0.257893,
+        0.073457,
+        -0.967248
+      ],
+      "aabb_max": [
+        0.264795,
+        0.25469,
+        -0.914716
+      ],
+      "n_vertices_orig": 1706,
+      "n_faces_orig": 1260
+    },
+    {
+      "id": 4,
+      "name": "base_body",
+      "slug": "4_base_body",
+      "objs": [
+        "original-41",
+        "original-28",
+        "original-43",
+        "original-52",
+        "original-22",
+        "original-26",
+        "original-3",
+        "original-44",
+        "original-8",
+        "original-45",
+        "original-49",
+        "original-54",
+        "original-27",
+        "original-51",
+        "original-55",
+        "original-50",
+        "original-6",
+        "original-23",
+        "original-42",
+        "original-24",
+        "original-47",
+        "original-53",
+        "original-7",
+        "original-1",
+        "original-46"
+      ],
+      "aabb_min": [
+        -0.344296,
+        -0.146393,
+        -0.970094
+      ],
+      "aabb_max": [
+        0.353387,
+        0.136585,
+        0.34615
+      ],
+      "n_vertices_orig": 13146,
+      "n_faces_orig": 9900
+    }
+  ]
+}

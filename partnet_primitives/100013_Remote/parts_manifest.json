@@ -1,0 +1,821 @@
+{
+  "obj_id": "100013",
+  "model_cat": "Remote",
+  "parts": [
+    {
+      "id": 1,
+      "name": "button",
+      "slug": "1_button",
+      "objs": [
+        "original-31"
+      ],
+      "aabb_min": [
+        -0.205507,
+        0.200353,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.109971,
+        0.258341,
+        0.094349
+      ],
+      "n_vertices_orig": 222,
+      "n_faces_orig": 74
+    },
+    {
+      "id": 2,
+      "name": "button",
+      "slug": "2_button",
+      "objs": [
+        "original-32"
+      ],
+      "aabb_min": [
+        -0.206569,
+        0.114304,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.111033,
+        0.172293,
+        0.094349
+      ],
+      "n_vertices_orig": 222,
+      "n_faces_orig": 74
+    },
+    {
+      "id": 3,
+      "name": "button",
+      "slug": "3_button",
+      "objs": [
+        "original-35"
+      ],
+      "aabb_min": [
+        -0.113979,
+        0.055657,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.011081,
+        0.158555,
+        0.098003
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 4,
+      "name": "button",
+      "slug": "4_button",
+      "objs": [
+        "original-36"
+      ],
+      "aabb_min": [
+        0.017113,
+        0.062709,
+        0.059633
+      ],
+      "aabb_max": [
+        0.12001,
+        0.165607,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 5,
+      "name": "button",
+      "slug": "5_button",
+      "objs": [
+        "original-34"
+      ],
+      "aabb_min": [
+        0.115933,
+        0.113615,
+        0.059633
+      ],
+      "aabb_max": [
+        0.211469,
+        0.171603,
+        0.094349
+      ],
+      "n_vertices_orig": 222,
+      "n_faces_orig": 74
+    },
+    {
+      "id": 6,
+      "name": "button",
+      "slug": "6_button",
+      "objs": [
+        "original-33"
+      ],
+      "aabb_min": [
+        0.114741,
+        0.202295,
+        0.059633
+      ],
+      "aabb_max": [
+        0.210277,
+        0.260283,
+        0.094349
+      ],
+      "n_vertices_orig": 222,
+      "n_faces_orig": 74
+    },
+    {
+      "id": 7,
+      "name": "button",
+      "slug": "7_button",
+      "objs": [
+        "original-14"
+      ],
+      "aabb_min": [
+        -0.201553,
+        0.803153,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.169692,
+        0.861966,
+        0.094349
+      ],
+      "n_vertices_orig": 438,
+      "n_faces_orig": 146
+    },
+    {
+      "id": 8,
+      "name": "button",
+      "slug": "8_button",
+      "objs": [
+        "original-15"
+      ],
+      "aabb_min": [
+        -0.126222,
+        0.854639,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.094361,
+        0.913452,
+        0.094349
+      ],
+      "n_vertices_orig": 438,
+      "n_faces_orig": 146
+    },
+    {
+      "id": 9,
+      "name": "button",
+      "slug": "9_button",
+      "objs": [
+        "original-13"
+      ],
+      "aabb_min": [
+        -0.039085,
+        0.901099,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.007224,
+        0.959912,
+        0.094349
+      ],
+      "n_vertices_orig": 438,
+      "n_faces_orig": 146
+    },
+    {
+      "id": 10,
+      "name": "button",
+      "slug": "10_button",
+      "objs": [
+        "original-16"
+      ],
+      "aabb_min": [
+        0.043039,
+        0.863403,
+        0.059633
+      ],
+      "aabb_max": [
+        0.0749,
+        0.922216,
+        0.094349
+      ],
+      "n_vertices_orig": 438,
+      "n_faces_orig": 146
+    },
+    {
+      "id": 11,
+      "name": "button",
+      "slug": "11_button",
+      "objs": [
+        "original-18"
+      ],
+      "aabb_min": [
+        0.126047,
+        0.862524,
+        0.059633
+      ],
+      "aabb_max": [
+        0.203556,
+        0.940034,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 12,
+      "name": "button",
+      "slug": "12_button",
+      "objs": [
+        "original-17"
+      ],
+      "aabb_min": [
+        0.112705,
+        0.812867,
+        0.059633
+      ],
+      "aabb_max": [
+        0.144566,
+        0.87168,
+        0.094349
+      ],
+      "n_vertices_orig": 438,
+      "n_faces_orig": 146
+    },
+    {
+      "id": 13,
+      "name": "button",
+      "slug": "13_button",
+      "objs": [
+        "original-21"
+      ],
+      "aabb_min": [
+        0.101589,
+        0.629363,
+        0.059633
+      ],
+      "aabb_max": [
+        0.186408,
+        0.714181,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 14,
+      "name": "button",
+      "slug": "14_button",
+      "objs": [
+        "original-23"
+      ],
+      "aabb_min": [
+        0.145223,
+        0.382742,
+        0.059633
+      ],
+      "aabb_max": [
+        0.246212,
+        0.627004,
+        0.094349
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 15,
+      "name": "button",
+      "slug": "15_button",
+      "objs": [
+        "original-25"
+      ],
+      "aabb_min": [
+        -0.11007,
+        0.308696,
+        0.059633
+      ],
+      "aabb_max": [
+        0.104284,
+        0.406098,
+        0.094349
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 16,
+      "name": "button",
+      "slug": "16_button",
+      "objs": [
+        "original-22"
+      ],
+      "aabb_min": [
+        -0.248597,
+        0.376701,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.147607,
+        0.620963,
+        0.094349
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 17,
+      "name": "button",
+      "slug": "17_button",
+      "objs": [
+        "original-20"
+      ],
+      "aabb_min": [
+        -0.209443,
+        0.632959,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.124624,
+        0.717777,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 18,
+      "name": "button",
+      "slug": "18_button",
+      "objs": [
+        "original-19"
+      ],
+      "aabb_min": [
+        -0.059725,
+        0.69757,
+        0.059633
+      ],
+      "aabb_max": [
+        0.025094,
+        0.782389,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 19,
+      "name": "button",
+      "slug": "19_button",
+      "objs": [
+        "original-24"
+      ],
+      "aabb_min": [
+        -0.119558,
+        0.589276,
+        0.059633
+      ],
+      "aabb_max": [
+        0.094797,
+        0.686679,
+        0.094349
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 20,
+      "name": "button",
+      "slug": "20_button",
+      "objs": [
+        "original-30"
+      ],
+      "aabb_min": [
+        -0.083544,
+        0.423476,
+        0.059633
+      ],
+      "aabb_max": [
+        0.068976,
+        0.575995,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 21,
+      "name": "button",
+      "slug": "21_button",
+      "objs": [
+        "original-28"
+      ],
+      "aabb_min": [
+        -0.221141,
+        -0.469609,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.082703,
+        -0.393446,
+        0.098003
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 22,
+      "name": "button",
+      "slug": "22_button",
+      "objs": [
+        "original-47"
+      ],
+      "aabb_min": [
+        -0.172566,
+        -0.351246,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.061014,
+        -0.239693,
+        0.098003
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 23,
+      "name": "button",
+      "slug": "23_button",
+      "objs": [
+        "original-50"
+      ],
+      "aabb_min": [
+        -0.033605,
+        -0.349905,
+        0.059633
+      ],
+      "aabb_max": [
+        0.077948,
+        -0.238352,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 24,
+      "name": "button",
+      "slug": "24_button",
+      "objs": [
+        "original-43"
+      ],
+      "aabb_min": [
+        0.103775,
+        -0.335087,
+        0.059633
+      ],
+      "aabb_max": [
+        0.215328,
+        -0.223534,
+        0.097618
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 25,
+      "name": "button",
+      "slug": "25_button",
+      "objs": [
+        "original-45"
+      ],
+      "aabb_min": [
+        0.089156,
+        -0.189456,
+        0.059633
+      ],
+      "aabb_max": [
+        0.200709,
+        -0.077903,
+        0.097618
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 26,
+      "name": "button",
+      "slug": "26_button",
+      "objs": [
+        "original-51"
+      ],
+      "aabb_min": [
+        -0.046675,
+        -0.207407,
+        0.059633
+      ],
+      "aabb_max": [
+        0.064878,
+        -0.095855,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 27,
+      "name": "button",
+      "slug": "27_button",
+      "objs": [
+        "original-48"
+      ],
+      "aabb_min": [
+        -0.176883,
+        -0.207407,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.065331,
+        -0.095855,
+        0.098003
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 28,
+      "name": "button",
+      "slug": "28_button",
+      "objs": [
+        "original-44"
+      ],
+      "aabb_min": [
+        -0.176883,
+        -0.058991,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.065331,
+        0.052562,
+        0.098003
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 29,
+      "name": "button",
+      "slug": "29_button",
+      "objs": [
+        "original-49"
+      ],
+      "aabb_min": [
+        -0.049112,
+        -0.048726,
+        0.059633
+      ],
+      "aabb_max": [
+        0.06244,
+        0.062827,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 30,
+      "name": "button",
+      "slug": "30_button",
+      "objs": [
+        "original-42"
+      ],
+      "aabb_min": [
+        0.092868,
+        -0.054232,
+        0.059633
+      ],
+      "aabb_max": [
+        0.20442,
+        0.057321,
+        0.097618
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 32,
+      "name": "button",
+      "slug": "32_button",
+      "objs": [
+        "original-38"
+      ],
+      "aabb_min": [
+        0.104907,
+        -0.77993,
+        0.059633
+      ],
+      "aabb_max": [
+        0.20341,
+        -0.672284,
+        0.098003
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 33,
+      "name": "button",
+      "slug": "33_button",
+      "objs": [
+        "original-29"
+      ],
+      "aabb_min": [
+        0.032684,
+        -0.719481,
+        0.059633
+      ],
+      "aabb_max": [
+        0.136258,
+        -0.615907,
+        0.098003
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 34,
+      "name": "button",
+      "slug": "34_button",
+      "objs": [
+        "original-37"
+      ],
+      "aabb_min": [
+        -0.200636,
+        -0.792809,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.102134,
+        -0.685163,
+        0.098003
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 35,
+      "name": "button",
+      "slug": "35_button",
+      "objs": [
+        "original-27"
+      ],
+      "aabb_min": [
+        -0.150119,
+        -0.717033,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.04549,
+        -0.612404,
+        0.098003
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 36,
+      "name": "button",
+      "slug": "36_button",
+      "objs": [
+        "original-4"
+      ],
+      "aabb_min": [
+        -0.229188,
+        -0.610881,
+        0.059633
+      ],
+      "aabb_max": [
+        -0.090751,
+        -0.534718,
+        0.098003
+      ],
+      "n_vertices_orig": 172,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 37,
+      "name": "button",
+      "slug": "37_button",
+      "objs": [
+        "original-52"
+      ],
+      "aabb_min": [
+        -0.064043,
+        -0.606266,
+        0.059633
+      ],
+      "aabb_max": [
+        0.074394,
+        -0.530102,
+        0.098003
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 38,
+      "name": "button",
+      "slug": "38_button",
+      "objs": [
+        "original-40"
+      ],
+      "aabb_min": [
+        0.093504,
+        -0.602918,
+        0.059633
+      ],
+      "aabb_max": [
+        0.231941,
+        -0.526754,
+        0.098003
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 39,
+      "name": "button",
+      "slug": "39_button",
+      "objs": [
+        "original-26"
+      ],
+      "aabb_min": [
+        0.09374,
+        -0.477313,
+        0.059633
+      ],
+      "aabb_max": [
+        0.232177,
+        -0.401149,
+        0.098003
+      ],
+      "n_vertices_orig": 456,
+      "n_faces_orig": 152
+    },
+    {
+      "id": 40,
+      "name": "button",
+      "slug": "40_button",
+      "objs": [
+        "original-46"
+      ],
+      "aabb_min": [
+        -0.04766,
+        -0.490716,
+        0.059633
+      ],
+      "aabb_max": [
+        0.063893,
+        -0.379164,
+        0.094349
+      ],
+      "n_vertices_orig": 420,
+      "n_faces_orig": 140
+    },
+    {
+      "id": 41,
+      "name": "base_body",
+      "slug": "41_base_body",
+      "objs": [
+        "original-41",
+        "original-2",
+        "original-8",
+        "original-9",
+        "original-39",
+        "original-5",
+        "original-54",
+        "original-55",
+        "original-6",
+        "original-56",
+        "original-11",
+        "original-12",
+        "original-53",
+        "original-7",
+        "original-10",
+        "original-57"
+      ],
+      "aabb_min": [
+        -0.335932,
+        -0.926267,
+        -0.083802
+      ],
+      "aabb_max": [
+        0.341337,
+        0.972726,
+        0.059633
+      ],
+      "n_vertices_orig": 12120,
+      "n_faces_orig": 4260
+    }
+  ]
+}

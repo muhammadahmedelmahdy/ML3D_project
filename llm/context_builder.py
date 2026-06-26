@@ -109,16 +109,35 @@ def _normalize_bboxes(parts: List[dict]) -> List[dict]:
 # Per-object loader
 # ---------------------------------------------------------------------------
 
-def load_object(obj_dir: str, category: str) -> Optional[dict]:
+def _load_from_object_json(obj_dir: str, category: str) -> Optional[dict]:
     """
-    Load one PartNet-Mobility object directory and return a context example.
+    Load bounding boxes from object.json (PartNet-Mobility v2 format).
 
-    Returns None if the object cannot be parsed (missing files, no geometry).
+    Each node in diffuse_tree has a pre-computed aabb with center + size,
+    so no OBJ parsing is needed.
     """
+    object_path = os.path.join(obj_dir, "object.json")
+    with open(object_path) as f:
+        data = json.load(f)
+
+    parts = []
+    for node in data.get("diffuse_tree", []):
+        aabb = node.get("aabb")
+        if not aabb:
+            continue
+        cx, cy, cz = aabb["center"]
+        sx, sy, sz = aabb["size"]
+        parts.append({
+            "label": node.get("name", "unknown"),
+            "bbox_min": [cx - sx / 2, cy - sy / 2, cz - sz / 2],
+            "bbox_max": [cx + sx / 2, cy + sy / 2, cz + sz / 2],
+        })
+    return parts or None
+
+
+def _load_from_mobility_v2(obj_dir: str) -> Optional[list]:
+    """Load bounding boxes from mobility_v2.json by parsing OBJ vertices."""
     mobility_path = os.path.join(obj_dir, "mobility_v2.json")
-    if not os.path.exists(mobility_path):
-        return None
-
     with open(mobility_path) as f:
         mobility = json.load(f)
 
@@ -132,6 +151,31 @@ def load_object(obj_dir: str, category: str) -> Optional[dict]:
             "bbox_min": bbox["bbox_min"],
             "bbox_max": bbox["bbox_max"],
         })
+    return parts or None
+
+
+def load_object(obj_dir: str, category: str) -> Optional[dict]:
+    """
+    Load one PartNet-Mobility object directory and return a context example.
+
+    Tries object.json first (pre-computed AABBs, no OBJ parsing needed),
+    then falls back to mobility_v2.json + OBJ vertex loading.
+
+    Returns None if the object cannot be parsed.
+    """
+    parts = None
+
+    if os.path.exists(os.path.join(obj_dir, "object.json")):
+        try:
+            parts = _load_from_object_json(obj_dir, category)
+        except Exception:
+            pass
+
+    if parts is None and os.path.exists(os.path.join(obj_dir, "mobility_v2.json")):
+        try:
+            parts = _load_from_mobility_v2(obj_dir)
+        except Exception:
+            pass
 
     if not parts:
         return None

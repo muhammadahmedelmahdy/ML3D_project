@@ -1,0 +1,49 @@
+{
+  "obj_id": "100142",
+  "model_cat": "Pliers",
+  "parts": [
+    {
+      "id": 1,
+      "name": "leg",
+      "slug": "1_leg",
+      "objs": [
+        "original-3",
+        "original-2"
+      ],
+      "aabb_min": [
+        -0.320935,
+        -0.005497,
+        -0.970329
+      ],
+      "aabb_max": [
+        0.186147,
+        0.03812,
+        0.998466
+      ],
+      "n_vertices_orig": 2836,
+      "n_faces_orig": 2198
+    },
+    {
+      "id": 2,
+      "name": "base_body",
+      "slug": "2_base_body",
+      "objs": [
+        "original-5",
+        "original-6",
+        "original-7"
+      ],
+      "aabb_min": [
+        -0.130397,
+        -0.042538,
+        -0.979879
+      ],
+      "aabb_max": [
+        0.297634,
+        0.059193,
+        0.999638
+      ],
+      "n_vertices_orig": 9461,
+      "n_faces_orig": 5508
+    }
+  ]
+}

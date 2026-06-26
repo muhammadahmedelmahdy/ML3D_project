@@ -1,5 +1,5 @@
 """
-Full pipeline: Qwen3-8B layout proposal → TRELLIS RePaint generation.
+Full pipeline: Qwen3-8B layout proposal → TRELLIS RePaint generation → evaluation.
 
 Usage:
   python run_llm_trellis.py \\
@@ -12,14 +12,17 @@ Usage:
       [--steps 250] \\
       [--num_resample_steps 10] \\
       [--seed 42] \\
-      [--formats mesh gaussian]
+      [--formats mesh gaussian] \\
+      [--evaluate] \\
+      [--render_video]
 
 Pipeline steps:
   1. Load PartNet-Mobility context examples for the requested category.
   2. Prompt Qwen3-8B (thinking mode) → JSON layout (parts + description).
   3. Convert bounding boxes → 64³ voxel mask + box-skeleton mesh.
   4. Run TRELLIS text-to-3D with RePaint conditioning on the box skeleton.
-  5. Save outputs (mesh / Gaussian / radiance field).
+  5. Save outputs (mesh OBJ / Gaussian PLY / GLB / video).
+  6. [optional] Evaluate layout fidelity (IoU) and shape quality (Chamfer).
 """
 
 import argparse
@@ -28,7 +31,6 @@ import os
 from pathlib import Path
 
 import torch
-import imageio
 import numpy as np
 
 
@@ -68,6 +70,16 @@ def parse_args():
                    help="Save the Qwen-proposed layout JSON alongside outputs")
     p.add_argument("--layout_json", default=None,
                    help="Skip Qwen and load a pre-existing layout JSON instead")
+    p.add_argument("--evaluate", action="store_true",
+                   help="Run layout IoU + Chamfer evaluation after generation")
+    p.add_argument("--n_refs", type=int, default=5,
+                   help="Number of PartNet-Mobility GT objects for Chamfer (--evaluate)")
+    p.add_argument("--render_video", action="store_true",
+                   help="Render a 360° turntable video of the generated asset")
+    p.add_argument("--video_frames", type=int, default=300,
+                   help="Number of frames for the turntable video")
+    p.add_argument("--export_glb", action="store_true",
+                   help="Export textured GLB (requires both 'mesh' and 'gaussian' formats)")
     return p.parse_args()
 
 
@@ -108,9 +120,9 @@ def main():
         )
         print(f"      Description: {layout['description']}")
         print(f"      Parts ({len(layout['parts'])}):")
-        for p in layout["parts"]:
-            print(f"        {p['label']:20s}  "
-                  f"min={p['bbox_min']}  max={p['bbox_max']}")
+        for part in layout["parts"]:
+            print(f"        {part['label']:20s}  "
+                  f"min={part['bbox_min']}  max={part['bbox_max']}")
 
     if args.save_layout or args.layout_json is None:
         layout_path = out_dir / "layout.json"
@@ -121,7 +133,7 @@ def main():
     # ── Step 3: Boxes → voxel mask + mesh ────────────────────────────────────
     print("[3/4] Converting bounding boxes to voxel mask …")
     from llm.box_to_voxel import layout_to_trellis_inputs
-    prompt, mesh, structure_mask_3d = layout_to_trellis_inputs(
+    prompt, box_mesh, structure_mask_3d = layout_to_trellis_inputs(
         layout, device="cuda"
     )
     print(f"      Prompt: '{prompt}'")
@@ -135,15 +147,12 @@ def main():
 
     pipeline = TrellisTextTo3DPipeline.from_pretrained(args.trellis_model)
     pipeline.cuda()
-
-    # Load the sparse-structure encoder (needed for RePaint Stage 1)
     pipeline.load_sparse_structure_encoder(args.ss_encoder_path)
 
     outputs = pipeline.run_inpaint(
         prompt=prompt,
-        mesh=mesh,
+        mesh=box_mesh,
         structure_mask_3d=structure_mask_3d,
-        # slat_known / slat_mask are None → Stage 2 generates from scratch
         seed=args.seed,
         sparse_structure_sampler_params={
             "steps": args.steps,
@@ -158,27 +167,87 @@ def main():
     )
 
     # ── Save outputs ──────────────────────────────────────────────────────────
+    mesh_result = None
+    gaussian_result = None
+
     if "mesh" in outputs:
-        import open3d as o3d
+        from evaluate import save_mesh_obj
+        mesh_result = outputs["mesh"][0]
         mesh_path = str(out_dir / "output.obj")
-        o3d.io.write_triangle_mesh(mesh_path, outputs["mesh"][0])
+        save_mesh_obj(mesh_result, mesh_path)
         print(f"      Mesh saved to {mesh_path}")
 
     if "gaussian" in outputs:
-        gs = outputs["gaussian"][0]
+        gaussian_result = outputs["gaussian"][0]
         gs_path = str(out_dir / "output.ply")
-        gs.save_ply(gs_path)
+        gaussian_result.save_ply(gs_path)
         print(f"      Gaussians saved to {gs_path}")
 
     if "radiance_field" in outputs:
         rf_path = str(out_dir / "output_rf.npz")
-        # Save strivec representation arrays
         rf = outputs["radiance_field"][0]
         np.savez(rf_path, **{k: v.cpu().numpy() for k, v in rf.__dict__.items()
                               if isinstance(v, torch.Tensor)})
         print(f"      Radiance field saved to {rf_path}")
 
-    print("Done.")
+    # ── Optional: textured GLB export ────────────────────────────────────────
+    if args.export_glb:
+        if mesh_result is not None and gaussian_result is not None:
+            from trellis.utils.postprocessing_utils import to_glb
+            print("      Exporting textured GLB …")
+            glb_mesh = to_glb(gaussian_result, mesh_result, verbose=True)
+            glb_path = str(out_dir / "output.glb")
+            glb_mesh.export(glb_path)
+            print(f"      GLB saved to {glb_path}")
+        else:
+            print("      Warning: --export_glb requires both 'mesh' and 'gaussian' "
+                  "in --formats. Skipping.")
+
+    # ── Optional: 360° turntable video ───────────────────────────────────────
+    if args.render_video:
+        import imageio
+        from trellis.utils.render_utils import render_video
+
+        # Prefer Gaussian for rendering (faster, higher quality)
+        render_target = gaussian_result if gaussian_result is not None else mesh_result
+        if render_target is not None:
+            print(f"      Rendering {args.video_frames}-frame turntable video …")
+            frames = render_video(render_target, num_frames=args.video_frames)
+            video_path = str(out_dir / "output.mp4")
+            imageio.mimsave(video_path, frames, fps=30)
+            print(f"      Video saved to {video_path}")
+        else:
+            print("      Warning: no decodable output for video rendering.")
+
+    # ── Optional: evaluation ──────────────────────────────────────────────────
+    if args.evaluate:
+        if mesh_result is None and "mesh" not in args.formats:
+            print("\nWarning: --evaluate requires 'mesh' in --formats. Skipping.")
+        else:
+            print("\n[Eval] Running evaluation …")
+            from evaluate import evaluate
+            eval_target = mesh_result if mesh_result is not None else (out_dir / "output.obj")
+            metrics = evaluate(
+                generated_mesh=eval_target,
+                proposed_mask_3d=structure_mask_3d,
+                partnet_root=args.partnet_root,
+                category=args.category,
+                n_refs=args.n_refs,
+                n_samples=10_000,
+                seed=args.seed,
+            )
+            metrics_path = out_dir / "metrics.json"
+            metrics_out = {k: v for k, v in metrics.items() if k != "chamfer_all"}
+            metrics_out["chamfer_all"] = metrics["chamfer_all"]
+            with open(metrics_path, "w") as f:
+                json.dump(metrics_out, f, indent=2)
+            print(f"\n[Eval] Metrics saved to {metrics_path}")
+            print(f"[Eval] layout_iou   = {metrics['layout_iou']:.4f}")
+            if metrics["chamfer_mean"] is not None:
+                print(f"[Eval] chamfer_mean = {metrics['chamfer_mean']:.6f}")
+                print(f"[Eval] chamfer_min  = {metrics['chamfer_min']:.6f}")
+
+    print("\nDone.")
 
 
 if __name__ == "__main__":

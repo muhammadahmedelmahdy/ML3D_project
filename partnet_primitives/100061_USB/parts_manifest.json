@@ -1,0 +1,46 @@
+{
+  "obj_id": "100061",
+  "model_cat": "USB",
+  "parts": [
+    {
+      "id": 1,
+      "name": "cap",
+      "slug": "1_cap",
+      "objs": [
+        "original-2"
+      ],
+      "aabb_min": [
+        -0.302769,
+        -0.120315,
+        0.331933
+      ],
+      "aabb_max": [
+        0.325068,
+        0.124934,
+        0.92053
+      ],
+      "n_vertices_orig": 2776,
+      "n_faces_orig": 2496
+    },
+    {
+      "id": 2,
+      "name": "base_body",
+      "slug": "2_base_body",
+      "objs": [
+        "original-1"
+      ],
+      "aabb_min": [
+        -0.323473,
+        -0.120315,
+        -1.000247
+      ],
+      "aabb_max": [
+        0.343583,
+        0.124934,
+        0.200491
+      ],
+      "n_vertices_orig": 3796,
+      "n_faces_orig": 2916
+    }
+  ]
+}
