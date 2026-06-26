@@ -112,6 +112,10 @@ ipch/
 *.VC.db
 *.VC.VC.opendb
 
+
+partnet_mobility/
+partnet_mobility_processed/
+pm.zip
 # Visual Studio profiler
 *.psess
 *.vsp
