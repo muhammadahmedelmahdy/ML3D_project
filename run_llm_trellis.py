@@ -124,6 +124,10 @@ def main():
             print(f"        {part['label']:20s}  "
                   f"min={part['bbox_min']}  max={part['bbox_max']}")
 
+        del proposer
+        torch.cuda.empty_cache()
+        print("      Qwen model unloaded from GPU.")
+
     if args.save_layout or args.layout_json is None:
         layout_path = out_dir / "layout.json"
         with open(layout_path, "w") as f:
@@ -212,7 +216,7 @@ def main():
         render_target = gaussian_result if gaussian_result is not None else mesh_result
         if render_target is not None:
             print(f"      Rendering {args.video_frames}-frame turntable video …")
-            frames = render_video(render_target, num_frames=args.video_frames)
+            frames = render_video(render_target, num_frames=args.video_frames)['color']
             video_path = str(out_dir / "output.mp4")
             imageio.mimsave(video_path, frames, fps=30)
             print(f"      Video saved to {video_path}")

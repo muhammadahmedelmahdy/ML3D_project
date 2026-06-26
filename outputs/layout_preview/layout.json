@@ -1,0 +1,44 @@
+{
+  "description": "A modern table with a rectangular tabletop, a single drawer on the front left side, and a sleek handle for the drawer.",
+  "parts": [
+    {
+      "label": "base",
+      "bbox_min": [
+        -0.5,
+        -0.5,
+        -0.25
+      ],
+      "bbox_max": [
+        0.5,
+        0.0,
+        0.25
+      ]
+    },
+    {
+      "label": "drawer",
+      "bbox_min": [
+        0.2,
+        0.0,
+        -0.15
+      ],
+      "bbox_max": [
+        0.5,
+        0.3,
+        0.15
+      ]
+    },
+    {
+      "label": "handle",
+      "bbox_min": [
+        0.35,
+        0.2,
+        -0.05
+      ],
+      "bbox_max": [
+        0.45,
+        0.3,
+        0.05
+      ]
+    }
+  ]
+}

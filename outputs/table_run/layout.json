@@ -1,0 +1,44 @@
+{
+  "description": "A modern table with a sleek base and a single drawer with a pull-out handle.",
+  "parts": [
+    {
+      "label": "base",
+      "bbox_min": [
+        -0.4,
+        -0.5,
+        -0.3
+      ],
+      "bbox_max": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    {
+      "label": "drawer",
+      "bbox_min": [
+        -0.2,
+        0.3,
+        -0.2
+      ],
+      "bbox_max": [
+        0.2,
+        0.45,
+        0.2
+      ]
+    },
+    {
+      "label": "handle",
+      "bbox_min": [
+        -0.05,
+        0.4,
+        0.2
+      ],
+      "bbox_max": [
+        0.05,
+        0.45,
+        0.25
+      ]
+    }
+  ]
+}
