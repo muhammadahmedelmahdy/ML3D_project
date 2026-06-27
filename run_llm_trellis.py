@@ -80,6 +80,10 @@ def parse_args():
                    help="Number of frames for the turntable video")
     p.add_argument("--export_glb", action="store_true",
                    help="Export textured GLB (requires both 'mesh' and 'gaussian' formats)")
+    p.add_argument("--no_thinking", action="store_true",
+                   help="Disable Qwen3 thinking mode (faster, EXP 5 ablation)")
+    p.add_argument("--generic_prompt", action="store_true",
+                   help="Replace Qwen description with 'a {category}' (EXP 6 ablation)")
     return p.parse_args()
 
 
@@ -112,7 +116,10 @@ def main():
     else:
         print(f"[2/4] Prompting Qwen3-8B for a '{args.category}' layout …")
         from llm.qwen_proposer import QwenLayoutProposer
-        proposer = QwenLayoutProposer(model_name=args.qwen_model)
+        proposer = QwenLayoutProposer(
+            model_name=args.qwen_model,
+            enable_thinking=not args.no_thinking,
+        )
         layout = proposer.propose(
             category=args.category,
             examples_str=examples_str,
@@ -135,6 +142,10 @@ def main():
         print(f"      Layout saved to {layout_path}")
 
     # ── Step 3: Boxes → voxel mask + mesh ────────────────────────────────────
+    if args.generic_prompt:
+        layout["description"] = f"a {args.category}"
+        print(f"      [generic_prompt] Description overridden → '{layout['description']}'")
+
     print("[3/4] Converting bounding boxes to voxel mask …")
     from llm.box_to_voxel import layout_to_trellis_inputs
     prompt, box_mesh, structure_mask_3d = layout_to_trellis_inputs(

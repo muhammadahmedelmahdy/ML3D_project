@@ -131,6 +131,7 @@ class QwenLayoutProposer:
         max_new_tokens: int = 4096,
         temperature: float = 0.7,
         top_p: float = 0.9,
+        enable_thinking: bool = True,
     ):
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -144,6 +145,7 @@ class QwenLayoutProposer:
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.top_p = top_p
+        self.enable_thinking = enable_thinking
 
     @torch.no_grad()
     def propose(
@@ -174,7 +176,7 @@ class QwenLayoutProposer:
             messages,
             tokenize=False,
             add_generation_prompt=True,
-            enable_thinking=True,   # Qwen3 thinking mode
+            enable_thinking=self.enable_thinking,
         )
 
         for attempt in range(retries):
