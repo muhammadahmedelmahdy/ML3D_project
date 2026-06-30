@@ -245,6 +245,14 @@ class FlowEulerRepaintSampler(GuidanceIntervalSamplerMixin, FlowEulerSampler):
 ## crop out the voxels for each part (split them back after denoising)
 ## you have parts to extract (show that on visuals)
 ## improvement on traditional repaint
+
+
+# 1- do animated generatopm (Nikola)
+# 2- the masking of trellis( play with it ) -->Mahdi
+# 3- in the pipeline, after generation, we should split the parts back to show that the layout is correct (jonas)
+# we show the parts to extract them form the layout
+
+# we compare against traditional repaint. (Mahdi)
     @torch.no_grad()
     def sample(
         self,
