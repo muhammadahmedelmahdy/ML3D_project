@@ -239,6 +239,12 @@ class FlowEulerRepaintSampler(GuidanceIntervalSamplerMixin, FlowEulerSampler):
             noised = self._forward_to_t(x0_known, t)
             return mask * noised + (1.0 - mask) * x_t
 
+## do animated generation 
+## play around with repaint (see something) --> have some kind of change on repaint (a bit of modifications (if you use softmax,stop masking at some point, repaint always does from start to end (play around with it)))
+## baseline is repaint (think about the masking (early stop masking), actual bounded generation)
+## crop out the voxels for each part (split them back after denoising)
+## you have parts to extract (show that on visuals)
+## improvement on traditional repaint
     @torch.no_grad()
     def sample(
         self,
