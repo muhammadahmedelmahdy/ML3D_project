@@ -11,6 +11,8 @@ Usage:
       [--n_examples 5] \\
       [--steps 250] \\
       [--num_resample_steps 10] \\
+      [--mask_schedule full|early_stop|linear_decay|cosine_decay] \\
+      [--t_stop_mask 0.2] \\
       [--seed 42] \\
       [--formats mesh gaussian] \\
       [--evaluate] \\
@@ -59,6 +61,16 @@ def parse_args():
                    help="TRELLIS denoising steps")
     p.add_argument("--num_resample_steps", type=int, default=10,
                    help="RePaint resampling iterations per timestep (U)")
+    p.add_argument("--mask_schedule", default="full",
+                   choices=["full", "early_stop", "linear_decay", "cosine_decay"],
+                   help="Known-region masking schedule for Stage 1 RePaint. "
+                        "'full' is baseline RePaint (mask enforced t=1..0); "
+                        "the others relax the mask below --t_stop_mask "
+                        "(EXP 7 ablation).")
+    p.add_argument("--t_stop_mask", type=float, default=0.0,
+                   help="Flow-time t (in [0,1], 1=noisiest) below which the "
+                        "mask's influence is relaxed. 0.0 = no relaxation "
+                        "(baseline RePaint), regardless of --mask_schedule.")
     p.add_argument("--cfg_strength", type=float, default=7.5,
                    help="Classifier-free guidance strength")
     p.add_argument("--seed", type=int, default=42)
@@ -173,6 +185,8 @@ def main():
             "steps": args.steps,
             "cfg_strength": args.cfg_strength,
             "num_resample_steps": args.num_resample_steps,
+            "mask_schedule": args.mask_schedule,
+            "t_stop_mask": args.t_stop_mask,
         },
         slat_sampler_params={
             "steps": args.steps,
@@ -257,7 +271,12 @@ def main():
             with open(metrics_path, "w") as f:
                 json.dump(metrics_out, f, indent=2)
             print(f"\n[Eval] Metrics saved to {metrics_path}")
-            print(f"[Eval] layout_iou   = {metrics['layout_iou']:.4f}")
+            print(f"[Eval] layout_iou   = {metrics['layout_iou']:.4f}  "
+                  f"(precision={metrics['layout_precision']:.4f}, "
+                  f"recall={metrics['layout_recall']:.4f})")
+            print(f"[Eval] coherence    = n_components={metrics['n_components']}  "
+                  f"largest_frac={metrics['largest_component_frac']:.4f}  "
+                  f"surface/volume={metrics['surface_to_volume']:.4f}")
             if metrics["chamfer_mean"] is not None:
                 print(f"[Eval] chamfer_mean = {metrics['chamfer_mean']:.6f}")
                 print(f"[Eval] chamfer_min  = {metrics['chamfer_min']:.6f}")

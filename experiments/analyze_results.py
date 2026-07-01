@@ -80,16 +80,19 @@ def collect_rows(output_root: Path) -> list[dict]:
             row: dict = json.load(f)
         row["run_dir"] = str(run_d)
 
+        metric_keys = [
+            "layout_iou", "layout_precision", "layout_recall",
+            "n_components", "largest_component_frac", "surface_to_volume",
+            "chamfer_mean", "chamfer_min",
+        ]
         if metrics_path.exists():
             with open(metrics_path) as f:
                 m = json.load(f)
-            row["layout_iou"] = m.get("layout_iou")
-            row["chamfer_mean"] = m.get("chamfer_mean")
-            row["chamfer_min"] = m.get("chamfer_min")
+            for k in metric_keys:
+                row[k] = m.get(k)
         else:
-            row["layout_iou"] = None
-            row["chamfer_mean"] = None
-            row["chamfer_min"] = None
+            for k in metric_keys:
+                row[k] = None
 
         if layout_path.exists():
             try:
@@ -182,6 +185,8 @@ def main():
 
     core = ["layout_iou", "chamfer_mean", "chamfer_min"]
     layout_q = ["num_parts", "frac_inbounds", "pairwise_overlap_frac"]
+    coherence = ["layout_precision", "layout_recall",
+                 "n_components", "largest_component_frac", "surface_to_volume"]
 
     print_experiment_table(rows, "exp1", core,
                            "EXP 1 — Category breadth")
@@ -195,6 +200,8 @@ def main():
                            "EXP 5 — Thinking mode ablation")
     print_experiment_table(rows, "exp6", core,
                            "EXP 6 — Text description ablation")
+    print_experiment_table(rows, "exp7", core + coherence,
+                           "EXP 7 — RePaint masking-schedule ablation")
 
     save_csv(rows, Path(args.csv_out))
 

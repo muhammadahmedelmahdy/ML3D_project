@@ -94,6 +94,111 @@ def mesh_result_to_o3d(mesh_result):
 # Layout IoU
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _mesh_to_clipped_o3d(generated_mesh):
+    """Load *generated_mesh* (path or MeshExtractResult) as an open3d mesh
+    clipped to the valid [-0.5, 0.5]^3 grid range."""
+    import open3d as o3d
+
+    if isinstance(generated_mesh, (str, Path)):
+        verts, faces = _load_obj(str(generated_mesh))
+        o3d_mesh = o3d.geometry.TriangleMesh()
+        o3d_mesh.vertices = o3d.utility.Vector3dVector(verts.astype(np.float64))
+        o3d_mesh.triangles = o3d.utility.Vector3iVector(faces.astype(np.int32))
+    else:
+        o3d_mesh = mesh_result_to_o3d(generated_mesh)
+
+    verts = np.asarray(o3d_mesh.vertices)
+    verts = np.clip(verts, -0.5 + 1e-6, 0.5 - 1e-6)
+    o3d_mesh.vertices = o3d.utility.Vector3dVector(verts)
+    return o3d_mesh
+
+
+def voxelize_mesh_dense(generated_mesh, reso: int = 64, fill: bool = True) -> np.ndarray:
+    """
+    Voxelize *generated_mesh* into a dense boolean occupancy grid.
+
+    Open3D's mesh voxelizer only marks voxels intersected by the mesh
+    *surface*, i.e. a hollow shell — but the LLM's proposed_mask_3d fills
+    boxes solidly. Comparing a shell against a solid mask makes recall
+    (and any "% occupied" metric) meaningless, so by default we flood-fill
+    the interior to get a solid occupancy volume matching the mask's
+    convention. Pass fill=False to get the raw surface-shell voxelization.
+
+    Args:
+        generated_mesh: MeshExtractResult, **or** a path to an OBJ file.
+        reso: Voxel grid resolution.
+        fill: Flood-fill the mesh interior (requires a reasonably watertight
+              mesh; default True).
+
+    Returns:
+        Bool array [reso, reso, reso].
+    """
+    import open3d as o3d
+    from scipy import ndimage
+
+    o3d_mesh = _mesh_to_clipped_o3d(generated_mesh)
+    vg = o3d.geometry.VoxelGrid.create_from_triangle_mesh_within_bounds(
+        o3d_mesh,
+        voxel_size=1.0 / reso,
+        min_bound=(-0.5, -0.5, -0.5),
+        max_bound=(0.5, 0.5, 0.5),
+    )
+    vol = np.zeros((reso, reso, reso), dtype=bool)
+    idx = np.array([v.grid_index for v in vg.get_voxels()], dtype=np.int64)
+    if len(idx) > 0:
+        idx = np.clip(idx, 0, reso - 1)
+        vol[idx[:, 0], idx[:, 1], idx[:, 2]] = True
+    if fill and vol.any():
+        vol = ndimage.binary_fill_holes(vol)
+    return vol
+
+
+def layout_precision_recall(
+    generated_mesh,
+    proposed_mask_3d: torch.Tensor,
+    reso: int = 64,
+) -> dict:
+    """
+    Split layout IoU into precision/recall to separate two failure modes
+    that a plain IoU number conflates:
+
+      recall    - fraction of the proposed box volume actually filled by the
+                  generated mesh ("did it respect the layout?").
+      precision - fraction of the generated volume that falls inside the
+                  proposed boxes ("did it leak outside the layout?").
+
+    This distinction matters for the RePaint masking-schedule ablation:
+    relaxing the mask (early_stop / *_decay in llm/box_to_voxel + the
+    FlowEulerRepaintSampler) is expected to trade some recall for smoother,
+    more coherent geometry (see shape_coherence()).
+
+    Args:
+        generated_mesh: MeshExtractResult, **or** a path to an OBJ file.
+        proposed_mask_3d: Float tensor [1,1,reso,reso,reso] from
+                          llm.box_to_voxel.boxes_to_voxel_mask().
+        reso: Voxel resolution (default 64).
+
+    Returns:
+        dict with keys "precision", "recall", "iou", all floats in [0, 1].
+    """
+    gen_vol = voxelize_mesh_dense(generated_mesh, reso=reso)
+    prop_vol = proposed_mask_3d.squeeze().cpu().numpy() > 0
+
+    intersection = int(np.logical_and(gen_vol, prop_vol).sum())
+    gen_count = int(gen_vol.sum())
+    prop_count = int(prop_vol.sum())
+
+    if gen_count == 0 and prop_count == 0:
+        return {"precision": 1.0, "recall": 1.0, "iou": 1.0}
+
+    union = gen_count + prop_count - intersection
+    return {
+        "precision": intersection / gen_count if gen_count > 0 else 1.0,
+        "recall": intersection / prop_count if prop_count > 0 else 1.0,
+        "iou": intersection / (union + 1e-8),
+    }
+
+
 def layout_iou(
     generated_mesh,
     proposed_mask_3d: torch.Tensor,
@@ -116,38 +221,63 @@ def layout_iou(
     Returns:
         IoU score in [0, 1].
     """
-    import open3d as o3d
+    return layout_precision_recall(generated_mesh, proposed_mask_3d, reso)["iou"]
 
-    # Accept either a MeshExtractResult or an OBJ path
-    if isinstance(generated_mesh, (str, Path)):
-        verts, faces = _load_obj(str(generated_mesh))
-        o3d_mesh = o3d.geometry.TriangleMesh()
-        o3d_mesh.vertices = o3d.utility.Vector3dVector(verts.astype(np.float64))
-        o3d_mesh.triangles = o3d.utility.Vector3iVector(faces.astype(np.int32))
-    else:
-        o3d_mesh = mesh_result_to_o3d(generated_mesh)
 
-    # Clip to valid grid range
-    verts = np.asarray(o3d_mesh.vertices)
-    verts = np.clip(verts, -0.5 + 1e-6, 0.5 - 1e-6)
-    o3d_mesh.vertices = o3d.utility.Vector3dVector(verts)
+def shape_coherence(generated_mesh, reso: int = 64) -> dict:
+    """
+    Geometric coherence diagnostics from the generated occupancy volume.
 
-    vg = o3d.geometry.VoxelGrid.create_from_triangle_mesh_within_bounds(
-        o3d_mesh,
-        voxel_size=1.0 / reso,
-        min_bound=(-0.5, -0.5, -0.5),
-        max_bound=(0.5, 0.5, 0.5),
-    )
-    gen_voxels: set = {tuple(v.grid_index) for v in vg.get_voxels()}
+    Baseline RePaint pastes the known box layout at every denoising step, so
+    the model never gets a chance to fuse geometry smoothly across box
+    boundaries; the hypothesis behind the masking-schedule ablation is that
+    relaxing the mask should reduce that fragmentation. These metrics make
+    that concrete without needing to know the box layout at all:
 
-    prop_coords = torch.argwhere(proposed_mask_3d.squeeze() > 0).cpu().tolist()
-    prop_voxels: set = {tuple(c) for c in prop_coords}
+      n_components           - number of 6-connected occupied components.
+      largest_component_frac - fraction of occupied voxels in the largest
+                                component (1.0 = a single coherent solid;
+                                lower means the boxes never fused into one
+                                object).
+      surface_to_volume      - surface voxel count / occupied voxel count.
+                                Higher indicates a jaggier / more fragmented
+                                boundary (e.g. blocky seams left by hard
+                                masking); lower is smoother.
 
-    if not gen_voxels and not prop_voxels:
-        return 1.0
-    intersection = len(gen_voxels & prop_voxels)
-    union = len(gen_voxels | prop_voxels)
-    return intersection / (union + 1e-8)
+    Args:
+        generated_mesh: MeshExtractResult, **or** a path to an OBJ file.
+        reso: Voxel resolution (default 64).
+
+    Returns:
+        dict with keys "n_components" (int), "largest_component_frac" (float),
+        "surface_to_volume" (float).
+    """
+    from scipy import ndimage
+
+    vol = voxelize_mesh_dense(generated_mesh, reso=reso)
+    occupied = int(vol.sum())
+    if occupied == 0:
+        return {"n_components": 0, "largest_component_frac": 0.0,
+                "surface_to_volume": 0.0}
+
+    structure = ndimage.generate_binary_structure(3, 1)  # 6-connectivity
+    labels, n_components = ndimage.label(vol, structure=structure)
+    sizes = np.bincount(labels.ravel())[1:]  # drop the background label (0)
+    largest_component_frac = float(sizes.max() / occupied)
+
+    # A voxel is "surface" if any of its 6 face-neighbors is empty/out of bounds.
+    padded = np.pad(vol, 1, mode="constant", constant_values=False)
+    neighbor_sum = np.zeros_like(vol, dtype=np.int8)
+    for dx, dy, dz in [(-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1)]:
+        neighbor_sum += padded[1 + dx:1 + dx + reso, 1 + dy:1 + dy + reso, 1 + dz:1 + dz + reso]
+    surface = vol & (neighbor_sum < 6)
+    surface_to_volume = float(surface.sum() / occupied)
+
+    return {
+        "n_components": int(n_components),
+        "largest_component_frac": round(largest_component_frac, 4),
+        "surface_to_volume": round(surface_to_volume, 4),
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -339,19 +469,43 @@ def evaluate(
 
     Returns:
         dict with keys:
-          layout_iou    – float in [0, 1]
+          layout_iou              – float in [0, 1]
+          layout_precision        – float in [0, 1], fraction of generated
+                                     volume inside the proposed boxes
+          layout_recall           – float in [0, 1], fraction of proposed
+                                     box volume filled by the generated mesh
+          n_components            – int, connected components in the
+                                     generated occupancy volume
+          largest_component_frac  – float in [0, 1], fraction of occupied
+                                     voxels in the largest component
+          surface_to_volume       – float, surface voxel count / occupied
+                                     voxel count (jaggedness proxy)
           chamfer_mean  – mean Chamfer distance to n_refs GT objects (or None)
           chamfer_min   – best (lowest) Chamfer distance (or None)
           chamfer_all   – list of per-object Chamfer distances
     """
     results: dict = {}
 
-    # ── 1. Layout IoU ─────────────────────────────────────────────────────────
-    print("  Computing layout IoU …")
-    iou = layout_iou(generated_mesh, proposed_mask_3d)
-    results["layout_iou"] = iou
-    print(f"    Layout IoU: {iou:.4f}  "
-          f"({'good' if iou > 0.4 else 'low — mesh may not follow the proposed layout'})")
+    # ── 1. Layout IoU / precision / recall ────────────────────────────────────
+    print("  Computing layout IoU / precision / recall …")
+    layout_metrics = layout_precision_recall(generated_mesh, proposed_mask_3d)
+    results["layout_iou"] = layout_metrics["iou"]
+    results["layout_precision"] = layout_metrics["precision"]
+    results["layout_recall"] = layout_metrics["recall"]
+    print(f"    Layout IoU: {layout_metrics['iou']:.4f}  "
+          f"(precision={layout_metrics['precision']:.4f}, "
+          f"recall={layout_metrics['recall']:.4f})  "
+          f"({'good' if layout_metrics['iou'] > 0.4 else 'low — mesh may not follow the proposed layout'})")
+
+    # ── 1b. Shape coherence (fragmentation / seam-jaggedness proxy) ──────────
+    print("  Computing shape coherence …")
+    coherence = shape_coherence(generated_mesh)
+    results["n_components"] = coherence["n_components"]
+    results["largest_component_frac"] = coherence["largest_component_frac"]
+    results["surface_to_volume"] = coherence["surface_to_volume"]
+    print(f"    Components: {coherence['n_components']}  "
+          f"largest_frac={coherence['largest_component_frac']:.4f}  "
+          f"surface/volume={coherence['surface_to_volume']:.4f}")
 
     # ── 2. Chamfer vs PartNet-Mobility ground truth ───────────────────────────
     print(f"  Computing Chamfer distance vs {n_refs} PartNet-Mobility references …")
@@ -457,6 +611,11 @@ def main():
 
     print("\nSummary:")
     print(f"  layout_iou    = {results['layout_iou']:.4f}")
+    print(f"  layout_precision = {results['layout_precision']:.4f}")
+    print(f"  layout_recall    = {results['layout_recall']:.4f}")
+    print(f"  n_components     = {results['n_components']}")
+    print(f"  largest_component_frac = {results['largest_component_frac']:.4f}")
+    print(f"  surface_to_volume       = {results['surface_to_volume']:.4f}")
     if results["chamfer_mean"] is not None:
         print(f"  chamfer_mean  = {results['chamfer_mean']:.6f}")
         print(f"  chamfer_min   = {results['chamfer_min']:.6f}")

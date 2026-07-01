@@ -223,36 +223,58 @@ class FlowEulerRepaintSampler(GuidanceIntervalSamplerMixin, FlowEulerSampler):
         eps = torch.randn_like(feats)
         return (1.0 - t) * feats + (self.sigma_min + (1.0 - self.sigma_min) * t) * eps
 
-    def _apply_repaint_mask(self, x_t, x0_known, mask, t: float):
+    def _apply_repaint_mask(self, x_t, x0_known, mask, t: float, weight: float = 1.0):
         """
         Paste the known region (noised to t) into x_t.
 
         Dense path  – x_t: [N,C,H,W,D], x0_known: same, mask: [N,1,H,W,D]
         Sparse path – x_t: SparseTensor, x0_known: SparseTensor,
                       mask: [V] bool/float (one entry per voxel)
+
+        `weight` scales the mask before blending (see _mask_weight()); 1.0
+        recovers the original hard RePaint paste, 0.0 disables pasting
+        entirely for this step.
         """
         if isinstance(x_t, sp.SparseTensor):
             noised = self._forward_to_t(x0_known.feats, t)
-            m = mask.float().unsqueeze(-1)          # [V, 1]
+            m = (mask.float() * weight).unsqueeze(-1)          # [V, 1]
             return x_t.replace(m * noised + (1.0 - m) * x_t.feats)
         else:
             noised = self._forward_to_t(x0_known, t)
-            return mask * noised + (1.0 - mask) * x_t
+            m = mask * weight
+            return m * noised + (1.0 - m) * x_t
 
-## do animated generation 
-## play around with repaint (see something) --> have some kind of change on repaint (a bit of modifications (if you use softmax,stop masking at some point, repaint always does from start to end (play around with it)))
-## baseline is repaint (think about the masking (early stop masking), actual bounded generation)
-## crop out the voxels for each part (split them back after denoising)
-## you have parts to extract (show that on visuals)
-## improvement on traditional repaint
+    def _mask_weight(self, t: float, mask_schedule: str, t_stop_mask: float) -> float:
+        """
+        Scalar in [0, 1] scaling the known-region mask at flow-time t (1 =
+        noisiest / start of sampling, 0 = clean / end).
 
+        Plain RePaint pastes the known region at every step from t=1 to t=0
+        ("full" below). The remaining schedules relax that constraint over
+        the tail of the trajectory (t < t_stop_mask), trading strict box
+        adherence for more freedom to harmonize geometry across box seams:
 
-# 1- do animated generatopm (Nikola)
-# 2- the masking of trellis( play with it ) -->Mahdi
-# 3- in the pipeline, after generation, we should split the parts back to show that the layout is correct (jonas)
-# we show the parts to extract them form the layout
+          full         - baseline: paste at every step, weight always 1.
+          early_stop   - paste at full strength until t_stop_mask, then a
+                         hard cutoff to 0 (mask dropped entirely).
+          linear_decay - taper the paste strength linearly to 0 over
+                         (t_stop_mask, 1] instead of an abrupt cutoff.
+          cosine_decay - same idea with a cosine ease so the transition is
+                         softer near both ends than linear_decay.
+        """
+        if mask_schedule == "full" or t_stop_mask <= 0.0:
+            return 1.0
+        if t <= t_stop_mask:
+            return 0.0
+        if mask_schedule == "early_stop":
+            return 1.0
+        frac = (t - t_stop_mask) / (1.0 - t_stop_mask)  # in (0, 1]
+        if mask_schedule == "linear_decay":
+            return frac
+        if mask_schedule == "cosine_decay":
+            return 0.5 * (1.0 - np.cos(np.pi * frac))
+        raise ValueError(f"Unknown mask_schedule: {mask_schedule!r}")
 
-# we compare against traditional repaint. (Mahdi)
     @torch.no_grad()
     def sample(
         self,
@@ -267,6 +289,8 @@ class FlowEulerRepaintSampler(GuidanceIntervalSamplerMixin, FlowEulerSampler):
         cfg_strength: float = 3.0,
         cfg_interval: Tuple[float, float] = (0.0, 1.0),
         num_resample_steps: int = 1,
+        mask_schedule: str = "full",
+        t_stop_mask: float = 0.0,
         verbose: bool = True,
         **kwargs,
     ):
@@ -288,6 +312,11 @@ class FlowEulerRepaintSampler(GuidanceIntervalSamplerMixin, FlowEulerSampler):
             cfg_interval: Timestep range over which CFG is applied.
             num_resample_steps: RePaint U — resample iterations per timestep.
                                  1 = standard RePaint (no resampling loop).
+            mask_schedule: One of "full" (baseline), "early_stop",
+                           "linear_decay", "cosine_decay" — see _mask_weight().
+            t_stop_mask: Flow-time t at which the mask's influence reaches
+                         zero. 0.0 (default) reproduces baseline RePaint
+                         regardless of mask_schedule.
             verbose: Show tqdm progress bar.
 
         Returns:
@@ -304,9 +333,10 @@ class FlowEulerRepaintSampler(GuidanceIntervalSamplerMixin, FlowEulerSampler):
         ret = edict({"samples": None, "pred_x_t": [], "pred_x_0": []})
 
         for t, t_prev in tqdm(t_pairs, desc="Sampling [RePaint]", disable=not verbose):
+            weight = self._mask_weight(t, mask_schedule, t_stop_mask)
             for u in range(num_resample_steps):
                 # ── 1. Inject known region noised to current level t ──────────
-                sample = self._apply_repaint_mask(sample, x0_known, mask, t)
+                sample = self._apply_repaint_mask(sample, x0_known, mask, t, weight)
 
                 # ── 2. One Euler denoising step (CFG via _inference_model) ────
                 out = self.sample_once(
@@ -337,7 +367,10 @@ class FlowEulerRepaintSampler(GuidanceIntervalSamplerMixin, FlowEulerSampler):
             ret.pred_x_t.append(sample)
             ret.pred_x_0.append(out.pred_x_0)
 
-        # Final paste: set known region exactly to x0_known (t=0, noise ≈ 0)
-        sample = self._apply_repaint_mask(sample, x0_known, mask, 0.0)
+        # Final paste: set known region exactly to x0_known (t=0, noise ≈ 0).
+        # Respects the schedule — if masking was already relaxed to 0 before
+        # t=0 (early_stop / *_decay), it stays relaxed here too.
+        final_weight = self._mask_weight(0.0, mask_schedule, t_stop_mask)
+        sample = self._apply_repaint_mask(sample, x0_known, mask, 0.0, final_weight)
         ret.samples = sample
         return ret
